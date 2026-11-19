@@ -1382,71 +1382,103 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     if (state) seedShips();
   }
 
+  // ---------- 景色の色（版画の色の帯。時間帯で移る） ----------
+  var PRINT = {
+    sky: { night: ['#1D2944', '#24365A', '#2D4568', '#2D4568'], dawn: ['#6B7096', '#B39AB0', '#EDB89A', '#F6D4AF'],
+           day: ['#7DB9E0', '#9CCDEB', '#C2E2F2', '#C2E2F2'], dusk: ['#F4B266', '#F7C98E', '#F9DDB0', '#F9DDB0'] },
+    sea: { night: '#173F4A', dawn: '#4D7079', day: '#2D6A99', dusk: '#2F8080' },
+    wave: { night: '#2C6168', dawn: '#36575F', day: '#F4F8FA', dusk: '#1B4E52' },
+    isle: { night: '#1C140F', dawn: '#2E2420', day: '#34473C', dusk: '#33261F' },
+    isleGhost: { night: '#2D5560', dawn: '#7A5E6A', day: '#2D6A99', dusk: '#5B3B2B' },
+    tower: { night: '#EFE3C8', dawn: '#F7ECD6', day: '#FBF6EA', dusk: '#FBF1DC' },
+    band: { night: '#B8492B', dawn: '#C4553A', day: '#C42A2A', dusk: '#E2643F' },
+    towerGhost: { night: '#3E6F78', dawn: '#2F8080', day: '#2D6A99', dusk: '#2F8080' },
+    orb: { night: '#F3E6C4', dawn: '#FBE3BE', day: '#FFF3C4', dusk: '#FBEBCB' },
+    orbRing: { night: '#7FA6B0', dawn: '#E2643F', day: '#E2643F', dusk: '#E2643F' },
+    cloud: { night: '#33456A', dawn: '#F6D9C8', day: '#FFFFFF', dusk: '#FBE3C0' },
+    path: { night: '#F3E6C4', dawn: '#FBE3BE', day: '#FFFFFF', dusk: '#FBEBCB' },
+    hull: { night: '#1C140F', dawn: '#2E2420', day: '#33261F', dusk: '#33261F' }
+  };
+  // 月・日：x（画面幅の割合）、y（水平線までの割合）、半径、海面の光の道の濃さ
+  var ORB = { night: [0.23, 0.27, 22, 0.8], dawn: [0.76, 0.98, 26, 0.75], day: [0.82, 0.2, 20, 0], dusk: [0.73, 0.74, 44, 0.8] };
+  function pc(key, ph) { return lerpColor(PRINT[key][ph.from], PRINT[key][ph.to], ph.t); }
+  function pn(i, ph) { return lerpN(ORB[ph.from][i], ORB[ph.to][i], ph.t); }
   function drawSky(t, ph) {
-    var sc0 = SKY_COLORS[ph.from], sc1 = SKY_COLORS[ph.to];
-    var g = ctx.createLinearGradient(0, 0, 0, horizon);
-    g.addColorStop(0, lerpColor(sc0[0], sc1[0], ph.t));
-    g.addColorStop(0.5, lerpColor(sc0[1], sc1[1], ph.t));
-    g.addColorStop(0.85, lerpColor(sc0[2], sc1[2], ph.t));
-    g.addColorStop(1, lerpColor(sc0[3], sc1[3], ph.t));
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, horizon + 1);
+    var b0 = PRINT.sky[ph.from], b1 = PRINT.sky[ph.to], ys = [0, 0.49, 0.78, 0.925, 1];
+    for (var i = 0; i < 4; i++) {
+      ctx.fillStyle = lerpColor(b0[i], b1[i], ph.t);
+      ctx.fillRect(0, horizon * ys[i], W, horizon * (ys[i + 1] - ys[i]) + 1);
+    }
     var starVis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
-    ctx.fillStyle = '#fff6e0';
-    for (var i = 0; i < stars.length; i++) {
-      var s = stars[i];
-      var a = reduce ? 0.65 : 0.45 + 0.35 * Math.sin(t * s.sp + s.ph);
-      ctx.globalAlpha = Math.max(0, a * (1 - s.y / (horizon * 0.9)) * starVis);
-      ctx.fillRect(s.x, s.y, s.r, s.r);
+    if (starVis > 0.02) {
+      ctx.fillStyle = '#F3E6C4';
+      for (var k = 0; k < stars.length; k++) {
+        var st = stars[k];
+        var a = reduce ? 0.7 : 0.55 + 0.35 * Math.sin(t * st.sp + st.ph);
+        ctx.globalAlpha = Math.max(0, a * starVis);
+        ctx.beginPath(); ctx.arc(st.x, st.y, st.r * 0.9 + 0.4, 0, 6.283); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
-    // ふちのぼやけた薄雲。楕円をそのまま塗らず、放射グラデーションを横に引き伸ばして描く。
-    for (var j = 0; j < 3; j++) {
-      var sp = reduce ? 0 : 4 + j * 2, span = W + 360;
-      var cw = 110 + j * 40, ch = 7 + j * 3;
-      var x = ((j * W * 0.45 + t * sp) % span) - 180;
-      var cy = horizon * (0.6 + j * 0.11);
-      ctx.save();
-      ctx.translate(x, cy); ctx.scale(1, ch / cw);
-      var cg = ctx.createRadialGradient(0, 0, 0, 0, 0, cw);
-      cg.addColorStop(0, 'rgba(255,205,180,0.13)');
-      cg.addColorStop(0.55, 'rgba(255,205,180,0.06)');
-      cg.addColorStop(1, 'rgba(255,205,180,0)');
-      ctx.fillStyle = cg;
-      ctx.beginPath(); ctx.arc(0, 0, cw, 0, 6.283); ctx.fill();
-      ctx.restore();
-    }
-    drawMoon(ph);
+    drawOrb(ph);
+    drawClouds(t, ph);
     drawShoot();
+    if (state && Date.now() < state.boostUntil) drawWind(t);
   }
+
   // ---------- 月・星屑・流れ星(神秘的な演出) ----------
-  function moonPos() {
-    var frac = (dayT % DAY_CYCLE_SEC) / DAY_CYCLE_SEC;
-    return {
-      x: W * frac,
-      y: horizon * (0.14 + 0.06 * Math.sin(frac * 6.283 + 1.1))
-    };
+  function orbPos(ph) {
+    var u = W / 360;
+    return { x: W * pn(0, ph), y: horizon * pn(1, ph), r: pn(2, ph) * u, path: pn(3, ph) };
   }
-  function drawMoon(ph) {
-    var a = lerpN(MOON_VIS[ph.from], MOON_VIS[ph.to], ph.t);
-    if (a <= 0.02) { lastMoon = null; return; }
-    var m = moonPos(), r = Math.max(13, W * 0.042);
+
+  function drawOrb(ph) {
+    // 月と日は同じ「刷った円」。少しずれた輪で版のずれを出す。夜明けの日は水平線から半分だけ。
+    var o = orbPos(ph);
     ctx.save();
-    ctx.globalAlpha = a;
-    var halo = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r * 4.4);
-    halo.addColorStop(0, 'rgba(228,234,255,0.32)');
-    halo.addColorStop(1, 'rgba(228,234,255,0)');
-    ctx.fillStyle = halo;
-    ctx.fillRect(m.x - r * 4.4, m.y - r * 4.4, r * 8.8, r * 8.8);
-    var g = ctx.createRadialGradient(m.x - r * 0.32, m.y - r * 0.3, r * 0.1, m.x, m.y, r);
-    g.addColorStop(0, '#fbfbff'); g.addColorStop(1, '#ccd5ee');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 6.283); ctx.fill();
-    ctx.globalAlpha = a * 0.16; ctx.fillStyle = '#95a0c4';
-    ctx.beginPath(); ctx.arc(m.x - r * 0.3, m.y - r * 0.2, r * 0.22, 0, 6.283); ctx.fill();
-    ctx.beginPath(); ctx.arc(m.x + r * 0.26, m.y + r * 0.26, r * 0.16, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.rect(0, 0, W, horizon); ctx.clip();
+    ctx.fillStyle = pc('orb', ph);
+    ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = pc('orbRing', ph); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(o.x + 3, o.y + 2, o.r, 0, 6.283); ctx.stroke();
     ctx.restore();
-    lastMoon = { x: m.x, a: a };
+    lastMoon = o;
   }
+  // 平らな雲（版画の形）。ゆっくり流れる
+  var CLOUDS = [[0.08, 0.36, 1], [0.62, 0.6, 0.8], [0.36, 0.17, 0.66]];
+  function cloudPath(x, y, w) {
+    var h = w * 0.34;
+    ctx.beginPath();
+    ctx.rect(x + h * 0.3, y - h * 0.42, w - h * 0.6, h * 0.42);
+    var bumps = [[0.24, 0.42, 0.42], [0.5, 0.62, 0.6], [0.76, 0.44, 0.44]];
+    for (var i = 0; i < bumps.length; i++) {
+      var cx = x + w * bumps[i][0], cy = y - h * bumps[i][1], r = h * bumps[i][2];
+      ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, 6.283);
+    }
+  }
+  function drawClouds(t, ph) {
+    var col = pc('cloud', ph), span = W + 260;
+    for (var i = 0; i < CLOUDS.length; i++) {
+      var c = CLOUDS[i], w = W * 0.26 * c[2];
+      var x = ((c[0] * W + (reduce ? 0 : t * (2.5 + i * 1.2))) % span) - 130, y = horizon * c[1];
+      ctx.fillStyle = col; cloudPath(x, y, w); ctx.fill();
+    }
+  }
+  // 追い風が吹いているあいだ：空に風の筋
+  function drawWind(t) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    var span = W + 200;
+    for (var i = 0; i < 4; i++) {
+      var w = W * 0.22, x = ((i * 113 + (reduce ? 0 : t * 55)) % span) - 100, y = horizon * (0.3 + i * 0.15);
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + w * 0.5, y - 6, x + w, y);
+      ctx.quadraticCurveTo(x + w + 10, y + 3, x + w + 13, y - 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function updateShoot(dt, ph) {
     var nightish = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
     if (shootStar) {
@@ -1479,55 +1511,53 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     ctx.strokeStyle = g; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
   }
-  function drawMoonGlitter(t) {
-    if (!lastMoon || lastMoon.a <= 0.05) return;
-    var mx = lastMoon.x, a = lastMoon.a, rows = 9;
-    for (var i = 0; i < rows; i++) {
-      var y = horizon + (seaBottom() - horizon) * (i + 0.5) / rows;
-      var spread = 6 + i * 2.4;
-      var wob = reduce ? 0 : Math.sin(t * 1.6 + i * 1.3) * spread * 0.4;
-      var w = 9 + i * 2.2;
-      var al = a * (0.3 - i * 0.022) * (0.6 + 0.4 * (reduce ? 1 : Math.sin(t * 2.2 + i)));
-      if (al <= 0) continue;
-      ctx.fillStyle = 'rgba(228,234,255,' + al + ')';
-      ctx.fillRect(mx + wob - w / 2, y, w, 1.6);
-    }
-  }
-  function drawSparkles(t, ph) {
-    var vis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
-    if (vis <= 0.03) return;
-    ctx.fillStyle = 'rgba(185,255,232,1)';
-    for (var i = 0; i < sparkles.length; i++) {
-      var sp = sparkles[i];
-      var a = (0.18 + 0.32 * (reduce ? 0.6 : Math.sin(t * sp.sp + sp.ph))) * vis;
-      if (a <= 0) continue;
-      ctx.globalAlpha = a;
-      ctx.fillRect(sp.x, sp.y, sp.r, sp.r);
+  function drawMoonGlitter(t, ph) {
+    // 海面の光の道：月・日の下に、版画の横縞で
+    var o = lastMoon;
+    if (!o || o.path <= 0.02) return;
+    ctx.fillStyle = pc('path', ph);
+    var u = W / 360;
+    for (var i = 0; i < 9; i++) {
+      var y = horizon + 8 + i * (seaBottom() - horizon) / 9.5, w = (10 + i * 5) * u;
+      var wob = reduce ? 0 : Math.sin(t * 1.4 + i * 1.3) * 3;
+      ctx.globalAlpha = o.path * (1 - i * 0.06);
+      ctx.fillRect(o.x - w / 2 + (i % 2 ? 5 : -5) + wob, y, w, 3.5);
     }
     ctx.globalAlpha = 1;
   }
+
+  function drawSparkles(t, ph) {
+    var vis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
+    if (vis <= 0.03) return;
+    ctx.fillStyle = '#F3E6C4';
+    for (var i = 0; i < sparkles.length; i++) {
+      var sp = sparkles[i];
+      var a = (0.15 + 0.3 * (reduce ? 0.6 : Math.sin(t * sp.sp + sp.ph))) * vis;
+      if (a <= 0) continue;
+      ctx.globalAlpha = a;
+      ctx.fillRect(sp.x, sp.y, sp.r + 0.5, sp.r + 0.5);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function drawSea(t, ph) {
-    var sc0 = SEA_COLORS[ph.from], sc1 = SEA_COLORS[ph.to];
-    var g = ctx.createLinearGradient(0, horizon, 0, H);
-    g.addColorStop(0, lerpColor(sc0[0], sc1[0], ph.t));
-    g.addColorStop(0.35, lerpColor(sc0[1], sc1[1], ph.t));
-    g.addColorStop(1, lerpColor(sc0[2], sc1[2], ph.t));
-    ctx.fillStyle = g; ctx.fillRect(0, horizon, W, H - horizon);
-    ctx.fillStyle = 'rgba(240,170,130,0.35)'; ctx.fillRect(0, horizon, W, 1.5);
-    ctx.lineWidth = 1;
-    for (var i = 0; i < 7; i++) {
-      var y = horizon + (seaBottom() - horizon) * (i + 0.6) / 7;
-      ctx.strokeStyle = 'rgba(180,210,230,' + (0.05 + 0.015 * i) + ')';
+    ctx.fillStyle = pc('sea', ph); ctx.fillRect(0, horizon, W, H - horizon);
+    drawMoonGlitter(t, ph);
+    // 波：小さな弧の列（版画の模様）。行ごとに逆向きにゆっくり流れる
+    ctx.strokeStyle = pc('wave', ph); ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    var rows = 6, step = 44 * W / 360, drift = reduce ? 0 : (t * 4) % step;
+    for (var r = 0; r < rows; r++) {
+      var y = horizon + 16 + r * (seaBottom() - horizon + 30) / rows;
+      var off = (r % 2) * step / 2 + (r % 2 ? -drift : drift);
       ctx.beginPath();
-      for (var x = 0; x <= W; x += 12) {
-        var yy = y + Math.sin(x * 0.03 + (reduce ? 0 : t * 0.8) + i * 1.7) * 1.6;
-        if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      for (var x = -step * 2 + off; x < W + step; x += step) {
+        ctx.moveTo(x, y); ctx.quadraticCurveTo(x + step * 0.25, y - 8, x + step * 0.5, y);
       }
       ctx.stroke();
     }
-    drawMoonGlitter(t);
     drawSparkles(t, ph);
   }
+
   function lightDot(x, y, r, rgb, a) {
     var g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
     g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
@@ -1542,33 +1572,39 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     var k = Math.max(0, Math.min(1, (s.y - horizon) / (seaBottom() - horizon)));
     var sc = (0.75 + 0.7 * k) * u;
     var bob = reduce ? 0 : Math.sin(t * 1.3 + s.ph) * 1.4;
-    var lx, ly;
+    var lx, ly, ph = dayBlend();
+    var hull = s.lit ? '#6A5546' : pc('hull', ph), light = '#F3E6C4', sail = s.lit ? '#FBF1DC' : '#E2643F';
     ctx.save();
     ctx.translate(s.x, s.y + bob);
     ctx.scale(s.dir * sc, sc);
-    ctx.fillStyle = s.lit ? '#b9c7cb' : '#0a1722';
+    ctx.fillStyle = hull;
     ctx.beginPath();
     if (s.kind === 'cargo') {
       ctx.moveTo(-24, -8); ctx.lineTo(27, -8); ctx.lineTo(21, 0); ctx.lineTo(-22, 0); ctx.closePath(); ctx.fill();
-      ctx.fillRect(-22, -20, 10, 12); ctx.fillRect(-8, -13, 8, 5); ctx.fillRect(1, -13, 8, 5); ctx.fillRect(-4, -18, 8, 5);
+      ctx.fillStyle = light; ctx.fillRect(-22, -20, 10, 12);
+      ctx.fillStyle = sail; ctx.fillRect(-8, -13, 8, 5); ctx.fillRect(-4, -18, 8, 5);
+      ctx.fillStyle = '#F2C14E'; ctx.fillRect(1, -13, 8, 5);
       lx = -17; ly = -23;
     } else if (s.kind === 'fish') {
       ctx.moveTo(-13, -6); ctx.lineTo(14, -6); ctx.lineTo(9, 0); ctx.lineTo(-11, 0); ctx.closePath(); ctx.fill();
-      ctx.fillRect(-9, -13, 8, 7); ctx.fillRect(5.5, -17, 1, 11);
+      ctx.fillStyle = light; ctx.fillRect(-9, -13, 8, 7);
+      ctx.fillStyle = hull; ctx.fillRect(5.5, -17, 1.4, 11);
       lx = 6; ly = -18;
     } else {
       ctx.moveTo(-12, -4); ctx.lineTo(12, -4); ctx.lineTo(9, 0); ctx.lineTo(-9, 0); ctx.closePath(); ctx.fill();
-      ctx.fillRect(-0.5, -26, 1, 22);
-      ctx.fillStyle = s.lit ? '#e8eef0' : '#22364a';
+      ctx.fillRect(-0.7, -26, 1.4, 22);
+      ctx.fillStyle = sail;
       ctx.beginPath(); ctx.moveTo(1.5, -25); ctx.lineTo(1.5, -6); ctx.lineTo(14, -6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = light;
+      ctx.beginPath(); ctx.moveTo(-1.5, -22); ctx.lineTo(-1.5, -6); ctx.lineTo(-11, -6); ctx.closePath(); ctx.fill();
       lx = 0; ly = -28;
     }
     ctx.restore();
     s.y0 = s.y + bob; s.sc = sc; s.hit = 38 * sc;
-    var rgb = s.bonus && !s.done ? '255,214,138' : s.done ? '140,230,170' : '255,244,207';
-    var a = s.bonus && !s.done ? 0.6 + 0.4 * Math.sin(t * 5) : 0.8;
-    lightDot(s.x + s.dir * lx * sc, s.y0 + ly * sc, 1.7 * sc, rgb, a);
+    var rgb = s.bonus && !s.done ? '242,193,78' : s.done ? '140,230,170' : '255,244,207';
+    lightDot(s.x + s.dir * lx * sc, s.y0 + ly * sc, 1.7 * sc, rgb, s.bonus && !s.done ? 1 : 0.8);
   }
+
   function islandTopY(fx) {
     // 岩場の上辺の高さ(おおよそ)。タコを岩に張りつかせる位置に使う。
     if (fx > 0.5) fx = 1 - fx;
@@ -1577,93 +1613,95 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     if (fx < 0.42) return VH * (0.88 - 0.08 * (fx - 0.28) / 0.14);
     return VH * 0.8;
   }
-  function drawIsland() {
-    var g = ctx.createLinearGradient(0, VH * 0.8, 0, VH * 1.15);
-    g.addColorStop(0, '#14293a'); g.addColorStop(1, '#08131d');
-    ctx.fillStyle = g;
+  function islandPath(dx, dy) {
     ctx.beginPath();
-    ctx.moveTo(W * 0.06, H); ctx.lineTo(W * 0.12, VH * 1.02); ctx.lineTo(W * 0.28, VH * 0.88);
-    ctx.quadraticCurveTo(W * 0.36, VH * 0.8, W * 0.42, VH * 0.8);
-    ctx.lineTo(W * 0.58, VH * 0.8);
-    ctx.quadraticCurveTo(W * 0.64, VH * 0.8, W * 0.72, VH * 0.88);
-    ctx.lineTo(W * 0.88, VH * 1.02); ctx.lineTo(W * 0.94, H); ctx.closePath(); ctx.fill();
-    // 灯りに照らされた岩の縁
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(W * 0.2, VH * 0.95); ctx.lineTo(W * 0.28, VH * 0.88);
-    ctx.quadraticCurveTo(W * 0.36, VH * 0.8, W * 0.42, VH * 0.8);
-    ctx.lineTo(W * 0.58, VH * 0.8);
-    ctx.quadraticCurveTo(W * 0.64, VH * 0.8, W * 0.72, VH * 0.88);
-    ctx.lineTo(W * 0.8, VH * 0.95);
-    var rim = ctx.createLinearGradient(W * 0.2, 0, W * 0.8, 0);
-    rim.addColorStop(0, 'rgba(255,214,138,0)');
-    rim.addColorStop(0.5, 'rgba(255,214,138,0.32)');
-    rim.addColorStop(1, 'rgba(255,214,138,0)');
-    ctx.strokeStyle = rim; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.restore();
+    ctx.moveTo(W * 0.06 + dx, H); ctx.lineTo(W * 0.12 + dx, VH * 1.02 + dy); ctx.lineTo(W * 0.28 + dx, VH * 0.88 + dy);
+    ctx.quadraticCurveTo(W * 0.36 + dx, VH * 0.8 + dy, W * 0.42 + dx, VH * 0.8 + dy);
+    ctx.lineTo(W * 0.58 + dx, VH * 0.8 + dy);
+    ctx.quadraticCurveTo(W * 0.64 + dx, VH * 0.8 + dy, W * 0.72 + dx, VH * 0.88 + dy);
+    ctx.lineTo(W * 0.88 + dx, VH * 1.02 + dy); ctx.lineTo(W * 0.94 + dx, H); ctx.closePath();
   }
+  function drawIsland() {
+    var ph = dayBlend();
+    // 版のずれ：もう一色を少しずらして先に刷る
+    ctx.globalAlpha = 0.8; ctx.fillStyle = pc('isleGhost', ph); islandPath(3, 2); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = pc('isle', ph); islandPath(0, 0); ctx.fill();
+    // 岩肌の彫り跡
+    ctx.strokeStyle = 'rgba(255,240,220,0.14)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.3, VH * 0.9); ctx.quadraticCurveTo(W * 0.33, VH * 0.875, W * 0.36, VH * 0.89);
+    ctx.moveTo(W * 0.64, VH * 0.86); ctx.quadraticCurveTo(W * 0.67, VH * 0.845, W * 0.7, VH * 0.86);
+    ctx.moveTo(W * 0.44, VH * 0.95); ctx.quadraticCurveTo(W * 0.47, VH * 0.935, W * 0.5, VH * 0.95);
+    ctx.stroke();
+  }
+
   // ---------- 設備が景色に現れる ----------
   function nightness() { var ph = dayBlend(); return lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t); }
   function drawHut(t) {
     // 見習い灯台守: 岩場に灯台守の小屋。窓に灯りがともる
     if (!state || state.owned.keeper < 1) return;
+    var ph = dayBlend();
     var fx = 0.355, x = W * fx, y = islandTopY(fx) + 3;
     var hw = W * 0.075, hh = VH * 0.05;
-    ctx.fillStyle = '#1b3043';
+    ctx.fillStyle = pc('tower', ph);
     ctx.fillRect(x - hw / 2, y - hh, hw, hh);
-    ctx.fillStyle = '#0f1d2a';
-    ctx.beginPath(); ctx.moveTo(x - hw / 2 - 3, y - hh); ctx.lineTo(x, y - hh - VH * 0.03); ctx.lineTo(x + hw / 2 + 3, y - hh); ctx.closePath(); ctx.fill();
-    ctx.fillRect(x + hw * 0.18, y - hh - VH * 0.03, 3, VH * 0.02);
-    var n = nightness(), wa = 0.55 + 0.4 * n + (reduce ? 0 : 0.05 * Math.sin(t * 3));
-    var ww = hw * 0.22, wh = hh * 0.36;
-    ctx.fillStyle = 'rgba(255,214,138,' + wa + ')';
-    ctx.fillRect(x - hw * 0.28, y - hh * 0.68, ww, wh);
+    ctx.fillStyle = pc('band', ph);
+    ctx.beginPath(); ctx.moveTo(x - hw / 2 - 3, y - hh); ctx.lineTo(x, y - hh - VH * 0.035); ctx.lineTo(x + hw / 2 + 3, y - hh); ctx.closePath(); ctx.fill();
+    var n = nightness();
+    var ww = hw * 0.26, wh = hh * 0.42;
+    ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#33261F';
+    ctx.fillRect(x - hw * 0.28, y - hh * 0.7, ww, wh);
     if (n > 0.3) {
-      ctx.globalCompositeOperation = 'lighter';
-      lightDot(x - hw * 0.28 + ww / 2, y - hh * 0.68 + wh / 2, 1, '255,214,138', 0.35 * n);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.22 * n * (reduce ? 1 : 0.9 + 0.1 * Math.sin(t * 3));
+      ctx.beginPath(); ctx.arc(x - hw * 0.28 + ww / 2, y - hh * 0.7 + wh / 2, hw * 0.4, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
+
   function drawPier(t) {
     // 潮力発電所: 右の岩場から防波堤がのび、灯りが並ぶ
     if (!state || state.owned.plant < 1) return;
+    var ph = dayBlend();
     var y0 = VH * 0.93, x0 = W * 0.76, x1 = W * 1.04;
-    ctx.fillStyle = '#0e1c28';
+    ctx.fillStyle = pc('isle', ph);
     ctx.beginPath();
     ctx.moveTo(x0, y0 - 3); ctx.lineTo(x1, y0 - 5); ctx.lineTo(x1, y0 + 4); ctx.lineTo(x0, y0 + 6); ctx.closePath(); ctx.fill();
     var n = Math.max(0.35, nightness());
     var count = Math.min(6, 2 + Math.floor(Math.log(1 + state.owned.plant) / Math.log(2)));
     for (var i = 0; i < count; i++) {
       var fx = (i + 0.5) / count, lx = x0 + (x1 - x0 - W * 0.04) * fx, ly = y0 - 4 - fx * 2;
-      ctx.fillStyle = '#0e1c28'; ctx.fillRect(lx - 0.5, ly - 8, 1, 8);
-      var a = n * (0.7 + (reduce ? 0 : 0.3 * Math.sin(t * 2 + i)));
-      ctx.globalCompositeOperation = 'lighter';
-      lightDot(lx, ly - 9, 1.2, '170,220,255', a);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = pc('isle', ph); ctx.fillRect(lx - 0.7, ly - 8, 1.4, 8);
+      ctx.globalAlpha = n * (0.75 + (reduce ? 0 : 0.25 * Math.sin(t * 2 + i)));
+      ctx.fillStyle = '#F3E6C4';
+      ctx.beginPath(); ctx.arc(lx, ly - 9, 2.2, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
+
   var TURBINE_X = [0.86, 0.1, 0.94, 0.19, 0.78];
   function drawTurbines(t) {
     // 洋上風力発電: 水平線に風車が増えていく。羽が回り、赤い航空灯が点滅する
     if (!state || state.owned.wind < 1) return;
     var count = Math.min(5, 1 + Math.floor(Math.log(state.owned.wind) / Math.log(2)));
-    var h = VH * 0.075, blade = VH * 0.032;
+    var h = VH * 0.075, blade = VH * 0.032, n = nightness();
+    var col = n > 0.5 ? '#F3E6C4' : '#FBF6EA';
     for (var i = 0; i < count; i++) {
       var x = W * TURBINE_X[i], base = horizon + 1, hubY = base - h;
-      ctx.strokeStyle = 'rgba(200,215,225,0.55)'; ctx.lineWidth = 1.4;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, hubY); ctx.stroke();
       var ang = (reduce ? 0.6 : t * (0.9 + i * 0.07)) + i * 1.3;
-      ctx.lineWidth = 1.1;
+      ctx.lineWidth = 1.6;
       for (var k = 0; k < 3; k++) {
         var a = ang + k * 2.094;
         ctx.beginPath(); ctx.moveTo(x, hubY); ctx.lineTo(x + Math.cos(a) * blade, hubY + Math.sin(a) * blade); ctx.stroke();
       }
-      var blink = reduce ? 0.6 : (Math.sin(t * 2.4 + i * 0.9) > 0.6 ? 1 : 0.15);
-      ctx.globalCompositeOperation = 'lighter';
-      lightDot(x, hubY - 1, 1.1, '255,90,80', blink * Math.max(0.4, nightness()));
-      ctx.globalCompositeOperation = 'source-over';
+      var blink = reduce ? 0.7 : (Math.sin(t * 2.4 + i * 0.9) > 0.6 ? 1 : 0.25);
+      ctx.globalAlpha = blink; ctx.fillStyle = '#E2643F';
+      ctx.beginPath(); ctx.arc(x, hubY - 1, 1.8, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
+
   function drawSatellite(t) {
     // 人工衛星管制局: 夜空をゆっくり横切る衛星の光
     if (!state || state.owned.satellite < 1) return;
@@ -1678,7 +1716,7 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     ctx.globalCompositeOperation = 'source-over';
   }
   function drawFog(t) {
-    // 霧笛: ときどき海に霧が流れてくる
+    // 霧笛: ときどき海に霧が流れてくる（淡い紙色の帯）
     if (fog <= 0.01) return;
     for (var j = 0; j < 3; j++) {
       var sp = reduce ? 0 : 10 + j * 6, span = W * 1.6;
@@ -1688,13 +1726,15 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
       ctx.save();
       ctx.translate(cx, cy); ctx.scale(1, ch / cw);
       var g = ctx.createRadialGradient(0, 0, 0, 0, 0, cw);
-      g.addColorStop(0, 'rgba(205,220,230,' + (0.28 * fog) + ')');
-      g.addColorStop(1, 'rgba(205,220,230,0)');
+      g.addColorStop(0, 'rgba(236,231,220,' + (0.42 * fog) + ')');
+      g.addColorStop(0.7, 'rgba(236,231,220,' + (0.3 * fog) + ')');
+      g.addColorStop(1, 'rgba(236,231,220,0)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(0, 0, cw, 0, 6.283); ctx.fill();
       ctx.restore();
     }
   }
+
   function updateScenery(dt) {
     var target = rankIdx(rangeNow);
     towerGrow += (target - towerGrow) * Math.min(1, dt * 1.2);
@@ -1823,16 +1863,24 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     c.y0 = c.y - 6 * s; c.sc = s; c.hit = 30 * s;
   }
   function towerOff() { return (5 - towerGrow) * 0.028 * VH; }
-  function drawTower() {
-    var off = towerOff();
-    var topY = VH * 0.33 + off, baseY = VH * 0.8, tw1 = W * 0.032, tw2 = W * 0.05, len = baseY - topY;
-    ctx.save();
+  function towerBody(off, dx, dy) {
+    var topY = VH * 0.33 + off + dy, baseY = VH * 0.8 + dy, tw1 = W * 0.032, tw2 = W * 0.05;
     ctx.beginPath();
-    ctx.moveTo(lampX - tw1, topY); ctx.lineTo(lampX + tw1, topY);
-    ctx.lineTo(lampX + tw2, baseY); ctx.lineTo(lampX - tw2, baseY); ctx.closePath();
-    ctx.clip();
-    ctx.fillStyle = '#e9eef0'; ctx.fillRect(0, topY, W, len);
-    ctx.fillStyle = '#b9483a';
+    ctx.moveTo(lampX - tw1 + dx, topY); ctx.lineTo(lampX + tw1 + dx, topY);
+    ctx.lineTo(lampX + tw2 + dx, baseY); ctx.lineTo(lampX - tw2 + dx, baseY); ctx.closePath();
+  }
+  function drawTower() {
+    var off = towerOff(), ph = dayBlend();
+    var topY = VH * 0.33 + off, baseY = VH * 0.8, len = baseY - topY;
+    var lw = W * 0.027 * (towerGrow >= 4 ? 1.12 : 1), ltop = VH * 0.255 + off, lh = VH * 0.07;
+    // 版のずれ：塔と灯室の影を少しずらして先に刷る
+    ctx.fillStyle = pc('towerGhost', ph);
+    towerBody(off, 3, 2); ctx.fill();
+    ctx.fillRect(lampX - lw - 4 + 3, ltop + 2, lw * 2 + 8, lh);
+    ctx.save();
+    towerBody(off, 0, 0); ctx.clip();
+    ctx.fillStyle = pc('tower', ph); ctx.fillRect(0, topY, W, len);
+    ctx.fillStyle = pc('band', ph);
     if (towerGrow >= 2) {
       // 格が上がると赤い帯が2本になる
       ctx.fillRect(0, topY + len * 0.2, W, len * 0.13);
@@ -1840,36 +1888,42 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     } else {
       ctx.fillRect(0, topY + len * 0.4, W, len * 0.18);
     }
-    ctx.fillStyle = 'rgba(20,40,60,0.2)'; ctx.fillRect(lampX, topY, W, len);
+    ctx.fillStyle = 'rgba(51,38,31,0.08)'; ctx.fillRect(lampX, topY, W, len);
     ctx.restore();
-    ctx.fillStyle = '#2a3b4d';
+    var ink = '#33261F';
+    ctx.fillStyle = ink;
     ctx.fillRect(lampX - W * 0.045, VH * 0.325 + off, W * 0.09, 4);
-    var lw = W * 0.027 * (towerGrow >= 4 ? 1.12 : 1), ltop = VH * 0.255 + off, lh = VH * 0.07;
-    var c = 'rgb(255,' + Math.round(214 + 30 * pulse) + ',' + Math.round(138 + 70 * pulse) + ')';
+    var c = lerpColor('#F2C14E', '#FFF4D6', Math.min(1, pulse));
     ctx.fillStyle = c; ctx.fillRect(lampX - lw, ltop, lw * 2, lh);
-    ctx.fillStyle = '#2a3b4d';
+    ctx.fillStyle = ink;
     ctx.fillRect(lampX - lw, ltop, 2, lh); ctx.fillRect(lampX - 1, ltop, 2, lh); ctx.fillRect(lampX + lw - 2, ltop, 2, lh);
     if (towerGrow >= 1) {
       // 回廊の手すり
       var gy = VH * 0.325 + off, gw = W * 0.045;
-      ctx.fillStyle = '#2a3b4d';
-      ctx.fillRect(lampX - gw, gy - 7, gw * 2, 1.2);
-      for (var k = -3; k <= 3; k++) ctx.fillRect(lampX + k * gw / 3.2 - 0.6, gy - 7, 1.2, 7);
+      ctx.fillRect(lampX - gw, gy - 7, gw * 2, 1.6);
+      for (var k = -3; k <= 3; k++) ctx.fillRect(lampX + k * gw / 3.2 - 0.7, gy - 7, 1.4, 7);
     }
-    ctx.fillStyle = '#1d2c3b';
     ctx.beginPath();
-    ctx.moveTo(lampX - lw - 4, ltop); ctx.lineTo(lampX, VH * 0.215 + off); ctx.lineTo(lampX + lw + 4, ltop); ctx.closePath(); ctx.fill();
-    ctx.fillRect(lampX - 1, VH * 0.2 + off, 2, VH * 0.02);
+    ctx.moveTo(lampX - lw - 4, ltop); ctx.quadraticCurveTo(lampX, VH * 0.2 + off, lampX + lw + 4, ltop); ctx.closePath(); ctx.fill();
+    ctx.fillRect(lampX - 1, VH * 0.19 + off, 2, VH * 0.03);
+    if (state && Date.now() < state.boostUntil) {
+      // 追い風：てっぺんの小旗がたなびく
+      var fy = VH * 0.19 + off, wv = reduce ? 0 : Math.sin(Date.now() / 160) * 2;
+      ctx.fillStyle = pc('band', ph);
+      ctx.beginPath(); ctx.moveTo(lampX + 1, fy); ctx.quadraticCurveTo(lampX + 9, fy + 2 + wv, lampX + 16, fy - 1 + wv);
+      ctx.lineTo(lampX + 12, fy + 4 + wv); ctx.quadraticCurveTo(lampX + 7, fy + 7, lampX + 1, fy + 6); ctx.closePath(); ctx.fill();
+    }
     if (towerGrow >= 4.5) {
       // 最上位の格では、てっぺんに金の飾り
-      lightDot(lampX, VH * 0.198 + off, 1.6, '255,214,138', 0.7);
+      ctx.fillStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(lampX, VH * 0.186 + off, 2.6, 0, 6.283); ctx.fill();
     }
   }
+
   function drawBeam(dir, len) {
     if (len < 2) return;
-    var g = ctx.createLinearGradient(lampX, lampY, lampX + dir * len, lampY);
-    g.addColorStop(0, 'rgba(255,230,170,0.75)'); g.addColorStop(1, 'rgba(255,230,170,0)');
-    ctx.fillStyle = g;
+    var n = nightness();
+    ctx.fillStyle = 'rgba(255,244,214,' + (0.28 + 0.3 * n) + ')';
     var tilt = len * 0.05;
     ctx.beginPath();
     ctx.moveTo(lampX, lampY - 2);
@@ -1878,14 +1932,32 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     ctx.lineTo(lampX, lampY + 2);
     ctx.closePath(); ctx.fill();
   }
+
   function drawGlow(flash) {
-    var r = W * 0.16 * (1 + pulse * 0.4);
-    var g = ctx.createRadialGradient(lampX, lampY, 0, lampX, lampY, r);
-    g.addColorStop(0, 'rgba(255,240,200,' + Math.min(1, 0.55 + 0.3 * flash + 0.25 * pulse) + ')');
-    g.addColorStop(0.25, 'rgba(255,214,138,0.25)');
-    g.addColorStop(1, 'rgba(255,214,138,0)');
-    ctx.fillStyle = g; ctx.fillRect(lampX - r, lampY - r, r * 2, r * 2);
+    // 灯りのまわりの、刷った円の淡い光
+    var r = W * 0.075 * (1 + pulse * 0.5);
+    ctx.fillStyle = 'rgba(255,240,200,' + Math.min(0.45, 0.1 + 0.1 * flash + 0.25 * pulse) + ')';
+    ctx.beginPath(); ctx.arc(lampX, lampY, r, 0, 6.283); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,200,' + Math.min(0.35, 0.05 + 0.2 * pulse) + ')';
+    ctx.beginPath(); ctx.arc(lampX, lampY, r * 1.7, 0, 6.283); ctx.fill();
   }
+  // 紙の粒：景色全体に重ねる（1回だけ作って模様として敷く）
+  var grainPat = null;
+  function drawGrain() {
+    if (!grainPat) {
+      var g = document.createElement('canvas'); g.width = g.height = 160;
+      var gc = g.getContext('2d'), img = gc.createImageData(160, 160), r = rng(11);
+      for (var i = 0; i < img.data.length; i += 4) {
+        var v = r();
+        img.data[i] = 51; img.data[i + 1] = 38; img.data[i + 2] = 31;
+        img.data[i + 3] = v < 0.4 ? Math.round((0.4 - v) * 55) : 0;
+      }
+      gc.putImageData(img, 0, 0);
+      grainPat = ctx.createPattern(g, 'repeat');
+    }
+    ctx.fillStyle = grainPat; ctx.fillRect(0, 0, W, VH + 12);
+  }
+
   function drawOverlays(t) {
     if (bonus && !bonus.done) {
       var s = bonus, rr = (20 + (reduce ? 0 : 4 * Math.sin(t * 4))) * s.sc;
@@ -1931,9 +2003,11 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     }
     drawPier(t); drawIsland(); drawHut(t); drawTower(); drawCreature(t);
     drawFog(t);
+    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c));
     ctx.globalCompositeOperation = 'lighter';
-    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawRankFlash();
+    drawRankFlash();
     ctx.globalCompositeOperation = 'source-over';
+    drawGrain();
     drawOverlays(t);
   }
 
