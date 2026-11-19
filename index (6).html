@@ -1,0 +1,1614 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>灯りの岬</title>
+<meta name="description" content="灯台の灯りを磨いて光を集め、岬を大きく育てる放置ゲーム。">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMGIxYTI4Ii8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMjIiIHI9IjExIiBmaWxsPSIjZmZkNjhhIi8+CjxwYXRoIGQ9Ik0yNyAzMCBMMzcgMzAgTDQxIDU4IEwyMyA1OCBaIiBmaWxsPSIjZTllZmYzIi8+CjxyZWN0IHg9IjIzIiB5PSI0NiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIGZpbGw9IiNiOTQ4M2EiLz4KPC9zdmc+">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="灯りの岬">
+<meta property="og:title" content="灯りの岬">
+<meta property="og:description" content="灯台の灯りを磨いて光を集め、岬を大きく育てる放置ゲーム。">
+<meta property="og:url" content="https://kinotz.github.io/Akari-Misaki/">
+<meta property="og:image" content="https://kinotz.github.io/Akari-Misaki/ogimage.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="灯りの岬">
+<meta name="twitter:description" content="灯台の灯りを磨いて光を集め、岬を大きく育てる放置ゲーム。">
+<meta name="twitter:image" content="https://kinotz.github.io/Akari-Misaki/ogimage.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column. Header with rank, a tappable dusk scene with a lighthouse, a tabbed supply list, and a sticky dock holding the light counter and a lens-shaped polish button. Single dark theme by choice: the whole page is a night at the cape. */
+:root {
+  color-scheme: dark;
+  --ink: #0b1a28;
+  --panel: #112636;
+  --panel-hi: #17324a;
+  --line: #27465f;
+  --text: #e9eff3;
+  --muted: #8fa7b8;
+  --lamp: #ffd68a;
+  --lamp-deep: #f0a24a;
+  --lamp-ink: #2a1a05;
+  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --font-body: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; touch-action: manipulation; }
+:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* 画面いっぱいの背景。#seaはここに固定表示し、.wrapがその上をスクロールする。 */
+.scene { position: fixed; inset: 0; z-index: 0; background: #111c38; }
+#sea { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: pointer; }
+
+.wrap {
+  position: relative; z-index: 1;
+  max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;
+  padding-top: calc(56px + env(safe-area-inset-top, 0px));
+  padding-bottom: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap > * { min-width: 0; }
+
+/* カード類の背景部分はタップを素通りさせ、海(キャンバス)に届くようにする。
+   実際に操作するボタン・リンク・広告枠だけ、改めてタップを受け取る。 */
+.wrap { pointer-events: none; }
+.wrap button,
+.wrap a,
+.wrap details,
+.wrap summary,
+.wrap input,
+.wrap select,
+.wrap textarea,
+.wrap .adslot,
+.wrap .adslot * {
+  pointer-events: auto;
+}
+
+/* ガラスのような半透明パネル。海が透けて見えるように使う。
+   文字はパネルの不透明度に頼らず、影(text-shadow)で読みやすさを確保する。 */
+.glass {
+  background: rgba(17, 38, 54, 0.3);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  border: 1px solid rgba(39, 70, 95, 0.4);
+  text-shadow: 0 1px 6px rgba(5, 12, 20, 0.85);
+}
+
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+h1 { margin: 0; font: 800 26px/1.1 var(--font-display); letter-spacing: 0.08em; text-shadow: 0 2px 10px rgba(5, 12, 20, 0.75); }
+.rank { text-align: right; display: flex; flex-direction: column; gap: 1px; }
+.rank { cursor: pointer; background: none; border: 0; padding: 0; font: inherit; color: inherit; }
+.rank-name { font: 600 15px/1.3 var(--font-display); color: var(--lamp); text-shadow: 0 2px 10px rgba(5, 12, 20, 0.75); }
+.range { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; text-shadow: 0 2px 8px rgba(5, 12, 20, 0.75); }
+.range b { font-weight: 700; color: var(--text); }
+
+/* 海の上に浮かぶボタン類。.sceneが画面固定なので、ここも画面固定の座標で配置する。 */
+.toast {
+  position: fixed; z-index: 2;
+  bottom: calc(104px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+  max-width: calc(100% - 24px); padding: 7px 12px; border-radius: 8px;
+  background: rgba(11, 26, 40, 0.86); border: 1px solid var(--line);
+  font-size: 13px; text-align: center; pointer-events: none;
+}
+.bgm {
+  position: fixed; z-index: 2;
+  left: max(10px, env(safe-area-inset-left, 0px)); top: max(10px, env(safe-area-inset-top, 0px));
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid var(--line); background: rgba(11, 26, 40, 0.78); color: var(--muted);
+  font-size: 16px; line-height: 1; display: grid; place-items: center; cursor: pointer;
+}
+.bgm[aria-pressed="true"] { border-color: var(--lamp); color: var(--lamp); box-shadow: 0 0 0 3px rgba(255, 214, 138, 0.18); }
+
+.guide {
+  position: fixed; z-index: 2;
+  right: max(10px, env(safe-area-inset-right, 0px)); top: max(10px, env(safe-area-inset-top, 0px));
+  padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--lamp); background: rgba(11, 26, 40, 0.88); color: var(--lamp);
+  font-weight: 700; font-size: 13px; cursor: pointer; animation: ring 1.6s ease-out infinite;
+}
+@keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(255, 214, 138, 0.55); } 100% { box-shadow: 0 0 0 14px rgba(255, 214, 138, 0); } }
+.hint { margin: 0; font-size: 13px; color: var(--muted); text-shadow: 0 2px 8px rgba(5, 12, 20, 0.75); }
+
+.legend {
+  border-radius: 10px; padding: 10px 12px;
+  background: rgba(17, 38, 54, 0.28); border: 1px solid rgba(39, 70, 95, 0.4);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  text-shadow: 0 1px 6px rgba(5, 12, 20, 0.85);
+}
+.legend summary { cursor: pointer; font: 700 14px/1.4 var(--font-display); list-style: none; display: flex; align-items: center; gap: 6px; }
+.legend summary::-webkit-details-marker { display: none; }
+.legend summary::before { content: '▸'; font-size: 11px; color: var(--muted); transition: transform 0.15s; }
+.legend[open] summary::before { transform: rotate(90deg); }
+.legend p { margin: 10px 0 0; font-size: 13px; color: var(--muted); line-height: 1.75; }
+
+.shop {
+  border-radius: 10px; padding: 8px 10px 2px;
+  background: rgba(17, 38, 54, 0.3); border: 1px solid rgba(39, 70, 95, 0.4);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  text-shadow: 0 1px 6px rgba(5, 12, 20, 0.85);
+}
+.tabs { display: flex; align-items: flex-end; gap: 18px; border-bottom: 1px solid var(--line); }
+.tab {
+  background: none; border: 0; padding: 8px 2px 9px; margin-bottom: -1px; cursor: pointer;
+  font: 700 16px/1.3 var(--font-display); color: var(--muted); border-bottom: 2px solid transparent;
+}
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--lamp); }
+.tab small { font: 500 12px var(--font-body); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.qty { margin-left: auto; display: flex; gap: 4px; padding-bottom: 6px; }
+.qty button {
+  background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px;
+  padding: 2px 9px; font-size: 12px; min-height: 28px; cursor: pointer;
+}
+.qty button[aria-pressed="true"] { background: var(--lamp); border-color: var(--lamp); color: var(--lamp-ink); font-weight: 700; }
+
+.list { display: flex; flex-direction: column; }
+.row {
+  display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center;
+  width: 100%; min-height: 66px; padding: 11px 8px; text-align: left; cursor: pointer;
+  background: transparent; border: 0; border-bottom: 1px solid var(--line);
+}
+.row:disabled { cursor: default; }
+.row.afford { background: rgba(255, 214, 138, 0.07); }
+.row .own { font: 800 22px/1 var(--font-display); color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.row.afford .own { color: var(--lamp); }
+.row .info { display: flex; flex-direction: column; min-width: 0; }
+.row .name { font: 700 16px/1.35 var(--font-display); }
+.row .desc { font-size: 12.5px; color: var(--muted); }
+.row .rate { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row .buy { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+.row .cost { font: 800 18px/1.2 var(--font-display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.row.afford .cost { color: var(--lamp); }
+.row .unit { font-size: 11px; color: var(--muted); }
+.row.locked { cursor: default; opacity: 0.6; }
+.row.kind .own { font-size: 18px; border: 1px solid var(--line); border-radius: 4px; padding: 4px 0; }
+.empty { margin: 0; padding: 18px 8px; color: var(--muted); font-size: 13.5px; border-bottom: 1px solid var(--line); }
+
+.foot {
+  display: flex; flex-direction: column; gap: 10px; padding: 10px 12px;
+  border-radius: 10px; background: rgba(17, 38, 54, 0.26); border: 1px solid rgba(39, 70, 95, 0.38);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  text-shadow: 0 1px 6px rgba(5, 12, 20, 0.85);
+}
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+.stats div { display: flex; flex-direction: column; gap: 2px; }
+.stats dt { font-size: 11.5px; color: var(--muted); }
+.stats dd { margin: 0; font: 700 16px var(--font-display); font-variant-numeric: tabular-nums; }
+.note { margin: 0; font-size: 12px; color: var(--muted); }
+.reset { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.linkbtn { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; min-height: 30px; }
+.linkbtn.danger { border-color: #9a4a3d; color: #f0a99c; }
+
+.dock {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: rgba(17, 38, 54, 0.52); border: 1px solid rgba(39, 70, 95, 0.55); border-radius: 16px;
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+  box-shadow: 0 -10px 24px -12px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 6px rgba(5, 12, 20, 0.85);
+}
+.bank { display: flex; flex-direction: column; min-width: 0; }
+.bank .label { font-size: 11.5px; letter-spacing: 0.1em; color: var(--muted); }
+.bank strong { font: 800 30px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bank .cps { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.polish {
+  position: relative; flex: none; width: 78px; height: 78px; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center; align-content: center; color: var(--lamp-ink);
+  background: radial-gradient(circle at 35% 28%, #fff3c9 0, var(--lamp) 38%, var(--lamp-deep) 100%);
+  box-shadow: 0 0 0 3px rgba(255, 214, 138, 0.18), 0 10px 26px -8px rgba(240, 162, 74, 0.75);
+  user-select: none; -webkit-user-select: none; transition: transform 0.08s;
+}
+.polish::before {
+  content: ""; position: absolute; inset: 6px; border-radius: 50%; pointer-events: none;
+  background: repeating-radial-gradient(circle at center, transparent 0 5px, rgba(120, 70, 10, 0.22) 5px 6px);
+}
+.polish { -webkit-touch-callout: none; }
+.polish:active { transform: scale(0.94); }
+.polish span { position: relative; font: 800 19px/1 var(--font-display); }
+.polish small { position: relative; font: 700 11px/1.3 var(--font-body); opacity: 0.8; font-variant-numeric: tabular-nums; }
+
+.goal {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
+  border-radius: 10px; background: rgba(17, 38, 54, 0.3); border: 1px solid rgba(39, 70, 95, 0.4);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  text-shadow: 0 1px 6px rgba(5, 12, 20, 0.85);
+}
+.goal-line { display: flex; align-items: baseline; gap: 8px; }
+.goal-label { flex: none; font-size: 11.5px; letter-spacing: 0.1em; color: var(--muted); }
+.goal-line b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px/1.4 var(--font-display); }
+.goal-left { margin-left: auto; flex: none; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.goal[data-ready="true"] .goal-left { color: var(--lamp); font-weight: 700; }
+.goal-bar { height: 5px; border-radius: 3px; background: var(--panel-hi); overflow: hidden; }
+.goal-bar i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--lamp); }
+.dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: var(--lamp); vertical-align: middle; }
+
+.boost {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid rgba(39, 70, 95, 0.4); border-radius: 10px;
+  background: rgba(17, 38, 54, 0.3);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  text-shadow: 0 1px 6px rgba(5, 12, 20, 0.85);
+}
+.boost[data-on="true"] { border-color: var(--lamp); background: rgba(255, 214, 138, 0.08); }
+.boost-text { display: flex; flex-direction: column; min-width: 0; }
+.boost-text b { font: 700 15px/1.35 var(--font-display); }
+.boost-text span { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.boost-btn {
+  flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--lamp); background: transparent; color: var(--lamp); font-weight: 700; font-size: 13.5px;
+}
+.boost-btn:disabled { border-color: var(--line); color: var(--muted); cursor: default; }
+
+.adslot { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; }
+.adslot-tag { font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+.adslot-body { display: flex; justify-content: center; align-items: center; min-height: 50px; max-width: 100%; overflow: hidden; }
+.adslot-dummy {
+  display: grid; place-items: center; width: 320px; max-width: 100%; height: 50px;
+  border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); font-size: 12px;
+}
+.rewardAdBody {
+  display: flex; justify-content: center; align-items: flex-start;
+  width: 100%; max-height: 250px; overflow: hidden;
+  border-radius: 10px; background: #fff;
+}
+.rewardAdBody iframe { display: block; width: 300px; max-width: 100%; height: 250px; border: 0; }
+
+.adlayer {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(5, 12, 20, 0.9);
+}
+.adbox {
+  width: min(100%, 380px); padding: 20px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--panel); display: flex; flex-direction: column; gap: 12px; text-align: center;
+}
+.adtag { margin: 0; font-size: 11.5px; letter-spacing: 0.12em; color: var(--muted); }
+.adbox h2 { margin: 0; font: 800 20px/1.4 var(--font-display); }
+.adsub { margin: 0; font-size: 13px; color: var(--muted); }
+.adbar { height: 6px; border-radius: 3px; background: var(--ink); overflow: hidden; }
+.adbar i { display: block; height: 100%; width: 0; background: var(--lamp); }
+.adbtns { display: flex; flex-direction: column; gap: 8px; }
+.adgo { min-height: 46px; border: 0; border-radius: 10px; background: var(--lamp); color: var(--lamp-ink); font-weight: 700; font-size: 15px; cursor: pointer; }
+.adgo:disabled { background: var(--panel-hi); color: var(--muted); cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .guide { animation: none; }
+  .polish { transition: none; }
+}
+</style>
+</head>
+<body>
+<section class="scene" aria-label="夕暮れの岬">
+  <canvas id="sea" aria-label="灯台のある夕暮れの海。灯りや塔をタップすると光が集まり、金色に光る船をタップすると導けます"></canvas>
+</section>
+<button class="bgm" id="bgmBtn" type="button" aria-pressed="false" aria-label="ローファイのBGMを再生する">
+  <span aria-hidden="true">♪</span>
+</button>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<button class="guide" id="guide" type="button" hidden>信号船を導く</button>
+<div class="wrap">
+  <header class="head">
+    <h1>灯りの岬</h1>
+    <button class="rank" id="rankBtn" type="button" aria-label="いまの灯台の格について">
+      <span class="rank-name" id="rankName">港の常夜灯</span>
+      <span class="range">光達距離 <b id="rangeVal">3.0</b> 海里</span>
+    </button>
+  </header>
+
+  <p class="hint" id="hint">灯りか塔をタップして光を集めよう。金色に光る船が通ったら、タップして岬へ導こう。</p>
+
+  <details class="legend">
+    <summary>岬の言い伝え</summary>
+    <p>この岬には、小さな灯りがひとつあるだけだった。ある晩、通りかかった船が岩場で立ち往生し、岬に住む誰かがランプを掲げて一晩中それを照らし続けた。船は朝まで無事に持ちこたえ、それから岬には灯台守が置かれるようになった。代々の灯台守は鏡を磨き、歯車を巻き、やがて電気を引いて、光をどこまでも遠くへ届けてきた。「灯りの岬」という名は、その最初の晩に由来する。あなたは、その灯りを受け継いだ最新の灯台守だ。</p>
+  </details>
+
+  <section class="goal" id="goal" aria-label="次の目標">
+    <div class="goal-line">
+      <span class="goal-label">次の目標</span>
+      <b id="goalName">石油ランプ</b>
+      <span class="goal-left" id="goalLeft">あと 15 光</span>
+    </div>
+    <div class="goal-bar"><i id="goalFill"></i></div>
+  </section>
+
+  <section class="boost" id="boost" aria-label="追い風" hidden>
+    <div class="boost-text">
+      <b id="boostTitle">追い風を呼ぶ</b>
+      <span id="boostSub">広告を見ると、3分間 光が2倍になります。</span>
+    </div>
+    <button class="boost-btn" id="boostBtn" type="button">広告を見る</button>
+  </section>
+
+  <section class="shop" aria-label="岬の備え">
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabGen" role="tab" aria-selected="true" aria-controls="genList" type="button">設備</button>
+      <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/17</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
+      <div class="qty" id="qty" role="group" aria-label="まとめ買い">
+        <button type="button" data-q="1" aria-pressed="true">×1</button>
+        <button type="button" data-q="10" aria-pressed="false">×10</button>
+        <button type="button" data-q="max" aria-pressed="false">最大</button>
+      </div>
+    </div>
+    <div class="list" id="genList" role="tabpanel" aria-labelledby="tabGen"></div>
+    <div class="list" id="upList" role="tabpanel" aria-labelledby="tabUp" hidden></div>
+  </section>
+
+  <aside class="adslot" aria-label="広告">
+    <span class="adslot-tag">広告</span>
+    <div class="adslot-body" id="adSlot">
+      <!-- 広告タグの貼り付け場所: AD_TAG_START と AD_TAG_END の間を、広告サービスのタグに置き換えてください -->
+      <!-- AD_TAG_START -->
+      <!-- admax -->
+      <script src="https://adm.shinobi.jp/s/de6ad07874e444934b802b34734328b6"></script>
+      <!-- admax -->
+      <!-- AD_TAG_END -->
+    </div>
+  </aside>
+
+  <footer class="foot">
+    <dl class="stats">
+      <div><dt>導いた船</dt><dd id="stGuided">0隻</dd></div>
+      <div><dt>磨いた回数</dt><dd id="stTaps">0回</dd></div>
+      <div><dt>集めた光の合計</dt><dd id="stTotal">0</dd></div>
+    </dl>
+    <p class="note">進み具合はこの端末のブラウザに自動で保存されます。ページを閉じているあいだも、最大8時間まで半分の量で光が貯まります。</p>
+    <div class="reset">
+      <button class="linkbtn" id="resetBtn" type="button">最初からやり直す</button>
+      <span id="resetAsk" hidden>保存を消して最初から始めます。
+        <button class="linkbtn danger" id="resetYes" type="button">消す</button>
+        <button class="linkbtn" id="resetNo" type="button">やめる</button>
+      </span>
+    </div>
+  </footer>
+
+  <div class="dock">
+    <div class="bank">
+      <span class="label">集めた光</span>
+      <strong id="light">0</strong>
+      <span class="cps" id="cps">毎秒 0</span>
+    </div>
+    <button class="polish" id="polish" type="button" aria-label="灯りを磨く">
+      <span>磨く</span><small id="tapGain">+1</small>
+    </button>
+  </div>
+</div>
+
+<div class="adlayer" id="adLayer" role="dialog" aria-modal="true" aria-labelledby="adTitle" hidden>
+  <div class="adbox">
+    <p class="adtag">広告</p>
+    <h2 id="adTitle">広告を見て追い風をもらう</h2>
+    <p class="adsub">広告が表示されます。少しお待ちください。</p>
+    <div class="rewardAdBody" id="rewardAdBody"></div>
+    <div class="adbar"><i id="adFill"></i></div>
+    <div class="adbtns">
+      <button class="adgo" id="adGo" type="button" disabled>あと 15 秒</button>
+      <button class="linkbtn" id="adCancel" type="button">やめる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var KEY = 'akari-no-misaki:v1';
+
+  // 設備: 石油ランプから人工衛星管制局まで。cps は 1 台あたりの毎秒産出量。
+  var GENS = [
+    { id: 'lamp',      name: '石油ランプ',       desc: '芯を整えて火を灯す。',                   base: 15,          cps: 0.1 },
+    { id: 'mirror',    name: '反射鏡',           desc: '銀引きの鏡で光を一方向に集める。',       base: 100,         cps: 1 },
+    { id: 'keeper',    name: '見習い灯台守',     desc: '夜通しレンズを拭いてくれる。',           base: 700,         cps: 8 },
+    { id: 'clock',     name: '回転機構',         desc: '時計仕掛けの重りでレンズが回る。',       base: 12000,       cps: 47 },
+    { id: 'fresnel',   name: 'フレネルレンズ',   desc: '同心円のプリズムが光を束ねる。',         base: 130000,      cps: 260 },
+    { id: 'horn',      name: '霧笛',             desc: '霧の夜も船に岬の位置を知らせる。',       base: 1400000,     cps: 1400 },
+    { id: 'plant',     name: '潮力発電所',       desc: '岬の潮流から電気を起こす。',             base: 15000000,    cps: 7800 },
+    { id: 'wind',      name: '洋上風力発電',     desc: '沖に並ぶ風車群が夜どおし電気を送る。',   base: 160000000,   cps: 43000 },
+    { id: 'satellite', name: '人工衛星管制局',   desc: '軌道上の衛星が航路を見守り、灯台の役目を引き継ぐ。', base: 1700000000, cps: 240000 }
+  ];
+
+  // 強化: tap=磨く力の倍率, share=磨くたび毎秒産出の割合を加算, gen=設備の倍率, all=全体の倍率
+  var UPS = [
+    { id: 'cloth',     name: '柔らかい磨き布',   desc: '磨く力が2倍になる。',                       cost: 100,          tap: 2 },
+    { id: 'chamois',   name: '鹿革のクロス',     desc: '磨く力がさらに2倍。',                       cost: 1000,         tap: 2 },
+    { id: 'abrasive',  name: '研磨粉',           desc: '磨く力がさらに2倍。',                       cost: 25000,        tap: 2 },
+    { id: 'masterTap', name: '熟練の極み',       desc: '磨く力がさらに2倍。',                       cost: 5000000,      tap: 2 },
+    { id: 'hands',     name: '手慣れた手つき',   desc: '磨くたび、毎秒の産出量の5%も加わる。',     cost: 60000,        share: 0.05 },
+    { id: 'rapeseed',  name: '上質な菜種油',     desc: '石油ランプの産出が2倍。',                   cost: 200,          gen: 'lamp' },
+    { id: 'silver',    name: '銀の磨き直し',     desc: '反射鏡の産出が2倍。',                       cost: 1200,         gen: 'mirror' },
+    { id: 'manual',    name: '灯台守の手引き',   desc: '見習い灯台守の産出が2倍。',                 cost: 12000,        gen: 'keeper' },
+    { id: 'gear',      name: '精密な歯車',       desc: '回転機構の産出が2倍。',                     cost: 150000,       gen: 'clock' },
+    { id: 'prism',     name: 'プリズムの再研磨', desc: 'フレネルレンズの産出が2倍。',               cost: 1500000,      gen: 'fresnel' },
+    { id: 'amp',       name: '低音の増幅管',     desc: '霧笛の産出が2倍。',                         cost: 15000000,     gen: 'horn' },
+    { id: 'windtech',  name: '風車の整備',       desc: '洋上風力発電の産出が2倍。',                 cost: 1800000000,   gen: 'wind' },
+    { id: 'satcal',    name: '管制室の較正',     desc: '人工衛星管制局の産出が2倍。',               cost: 19000000000,  gen: 'satellite' },
+    { id: 'air',       name: '澄んだ夜気',       desc: 'すべての産出が1.25倍。',                    cost: 100000,       all: 1.25 },
+    { id: 'calm',      name: '凪の季節',         desc: 'すべての産出が1.5倍。',                     cost: 5000000,      all: 1.5 },
+    { id: 'spring',    name: '大潮',             desc: 'すべての産出が1.75倍。',                    cost: 80000000,     all: 1.75 },
+    { id: 'eternal',   name: '永遠の灯',         desc: 'すべての産出が2倍。',                       cost: 3000000000,   all: 2.0 }
+  ];
+
+  // 光達距離(海里)に応じた灯台の格
+  var RANKS = [
+    [0,  '港の常夜灯',     'ただの常夜灯だったころ、岬を通る船は数えるほどだった。'],
+    [6,  '防波堤の灯り',   '光が届く先、防波堤の向こうに船影が見えるようになった。'],
+    [10, '岬の小さな灯台', 'ようやく「灯台」と呼べる灯りになった。海図にも小さく載るほどに。'],
+    [14, '沖を照らす灯台', '沖合の霧の中でも、船はこの灯りを頼りに舵を切る。'],
+    [18, '海峡の大灯台',   '海峡を行き交うすべての船が、この灯りを目印にしている。'],
+    [22, '世界の果ての灯台', '世界のどこからでも知られる灯台になった。ここが、岬の行き着く先。']
+  ];
+
+  var GMAP = {}, UMAP = {};
+  GENS.forEach(function (g) { GMAP[g.id] = g; });
+  UPS.forEach(function (u) { UMAP[u.id] = u; });
+
+  function $(id) { return document.getElementById(id); }
+  var cv = $('sea'), ctx = cv.getContext('2d');
+  var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  var state = null;
+  var qty = 1;
+  var W = 0, H = 0, dpr = 1, horizon = 0, lampX = 0, lampY = 0;
+  var ships = [], floaters = [], stars = [], bonus = null;
+  var nextBonus = 10, ambientTimer = 1, pulse = 0, theta = 0, rangeNow = 3;
+  var creature = null, nextCreature = 35 + Math.random() * 35;
+
+  // ---------- 朝昼夜のうつろい ----------
+  var DAY_CYCLE_SEC = 480; // 1周8分
+  var DAY_PHASES = ['night', 'dawn', 'day', 'dusk'];
+  var SKY_COLORS = {
+    night: ['#050b16', '#0c1830', '#13213c', '#1b2d46'],
+    dawn:  ['#17213f', '#3a3f72', '#c98aa0', '#f3b98f'],
+    day:   ['#2b4a73', '#4f74a0', '#86aed0', '#cfe4f0'],
+    dusk:  ['#111c38', '#33376a', '#a46a86', '#e2a07b']
+  };
+  var SEA_COLORS = {
+    night: ['#15232f', '#0c1822', '#040a10'],
+    dawn:  ['#2a4258', '#16293c', '#071017'],
+    day:   ['#3f6f8c', '#245577', '#0c2436'],
+    dusk:  ['#2d4a63', '#173048', '#08131d']
+  };
+  var STAR_VIS = { night: 1, dawn: 0.45, day: 0.05, dusk: 0.55 };
+  var MOON_VIS = { night: 1, dawn: 0.4, day: 0, dusk: 0.6 };
+  var GOLDEN_FROM = 260, GOLDEN_TO = 305; // dayTのこの範囲で「凪の恵み」(産出1.5倍)
+  var dayT = 0, goldenWas = false;
+  var sparkles = [], lastMoon = null;
+  var shootStar = null, nextShoot = 9 + Math.random() * 16;
+  function lerpN(a, b, t) { return a + (b - a) * t; }
+  function hexRgb(hex) { var n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function lerpColor(c1, c2, t) {
+    var a = hexRgb(c1), b = hexRgb(c2);
+    return 'rgb(' + Math.round(lerpN(a[0], b[0], t)) + ',' + Math.round(lerpN(a[1], b[1], t)) + ',' + Math.round(lerpN(a[2], b[2], t)) + ')';
+  }
+  function dayBlend() {
+    var frac = (dayT % DAY_CYCLE_SEC) / DAY_CYCLE_SEC, seg = frac * 4;
+    var i = Math.floor(seg) % 4, j = (i + 1) % 4, lt = seg - Math.floor(seg);
+    var e = lt * lt * (3 - 2 * lt);
+    return { from: DAY_PHASES[i], to: DAY_PHASES[j], t: e };
+  }
+  function goldenActive() { var m = dayT % DAY_CYCLE_SEC; return m >= GOLDEN_FROM && m < GOLDEN_TO; }
+  var toastTimer = 0, upSig = null;
+
+  // ---------- 数の表示(万・億・兆) ----------
+  var UNITS = [[1e20, '垓'], [1e16, '京'], [1e12, '兆'], [1e8, '億'], [1e4, '万']];
+  function fmtNum(n) {
+    if (!isFinite(n)) return '∞';
+    if (n < 0) n = 0;
+    if (n < 10) return String(parseFloat(n.toFixed(1)));
+    if (n < 1e4) return Math.floor(n).toLocaleString('ja-JP');
+    for (var i = 0; i < UNITS.length; i++) {
+      if (n >= UNITS[i][0]) {
+        var x = n / UNITS[i][0];
+        return x.toFixed(x < 10 ? 2 : x < 100 ? 1 : 0) + UNITS[i][1];
+      }
+    }
+    return String(Math.floor(n));
+  }
+
+  // ---------- セーブ ----------
+  function fresh() {
+    var owned = {};
+    GENS.forEach(function (g) { owned[g.id] = 0; });
+    return { v: 1, light: 0, total: 0, taps: 0, guided: 0, found: 0, owned: owned, ups: {}, rank: 0, boostUntil: 0, seen: Date.now() };
+  }
+  function sanitize(s) {
+    if (!s || typeof s !== 'object') return null;
+    var b = fresh();
+    ['light', 'total', 'taps', 'guided', 'found', 'rank', 'boostUntil', 'seen'].forEach(function (k) {
+      if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] >= 0) b[k] = s[k];
+    });
+    GENS.forEach(function (g) {
+      var n = s.owned && s.owned[g.id];
+      if (typeof n === 'number' && isFinite(n) && n >= 0) b.owned[g.id] = Math.floor(n);
+    });
+    UPS.forEach(function (u) { if (s.ups && s.ups[u.id]) b.ups[u.id] = true; });
+    return b;
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? sanitize(JSON.parse(raw)) : null;
+    } catch (e) { return null; }
+  }
+  function save() {
+    try { state.seen = Date.now(); localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // ---------- ゲームの計算 ----------
+  function genMult(id) {
+    var m = 1;
+    UPS.forEach(function (u) { if (state.ups[u.id] && u.gen === id) m *= 2; });
+    return m;
+  }
+  function allMult() {
+    var m = 1;
+    UPS.forEach(function (u) { if (state.ups[u.id] && u.all) m *= u.all; });
+    return m;
+  }
+  function unit(g) { return g.cps * genMult(g.id) * allMult(); }
+  function cpsBase() {
+    var s = 0;
+    GENS.forEach(function (g) { s += state.owned[g.id] * unit(g); });
+    return s;
+  }
+  function cps() { return cpsBase() * boostMult(); }
+  function tapPower() {
+    var m = 1, share = 0;
+    UPS.forEach(function (u) {
+      if (!state.ups[u.id]) return;
+      if (u.tap) m *= u.tap;
+      if (u.share) share += u.share;
+    });
+    return m + cps() * share;
+  }
+  function rangeOf(total) { return 3 + 1.5 * Math.log10(1 + total); }
+  function rankIdx(r) {
+    var idx = 0;
+    RANKS.forEach(function (x, i) { if (r >= x[0]) idx = i; });
+    return idx;
+  }
+  function plan(g) {
+    var own = state.owned[g.id], n = 0, sum = 0, c;
+    if (qty === 'max') {
+      while (n < 500) {
+        c = Math.ceil(g.base * Math.pow(1.15, own + n));
+        if (sum + c > state.light) break;
+        sum += c; n++;
+      }
+      if (n === 0) { n = 1; sum = Math.ceil(g.base * Math.pow(1.15, own)); }
+    } else {
+      for (var i = 0; i < qty; i++) sum += Math.ceil(g.base * Math.pow(1.15, own + i));
+      n = qty;
+    }
+    return { n: n, cost: sum };
+  }
+  function gain(x) { state.light += x; state.total += x; }
+
+  // ---------- 操作 ----------
+  function toast(msg, ms) {
+    var el = $('toast');
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; }, ms || 3200);
+  }
+  function addFloater(x, y, text) { floaters.push({ x: x, y: y, text: text, age: 0 }); }
+
+  function polish() {
+    var p = tapPower();
+    gain(p);
+    state.taps++;
+    pulse = 1;
+    addFloater(lampX + (Math.random() - 0.5) * 36, lampY - 16, '+' + fmtNum(p));
+    renderAll();
+  }
+  function buyGen(id) {
+    var g = GMAP[id], p = plan(g);
+    if (state.light < p.cost) return;
+    state.light -= p.cost;
+    state.owned[id] += p.n;
+    pulse = Math.max(pulse, 0.6);
+    renderAll(); save();
+  }
+  function buyUp(id) {
+    var u = UMAP[id];
+    if (state.ups[id] || state.light < u.cost) return;
+    state.light -= u.cost;
+    state.ups[id] = true;
+    renderAll(); save();
+  }
+  function guide() {
+    if (!bonus || bonus.done) return;
+    bonus.done = true;
+    var reward = Math.max(100, cps() * 45);
+    gain(reward);
+    state.guided++;
+    addFloater(bonus.x, bonus.y - 30, '+' + fmtNum(reward));
+    toast('船を無事に導きました。光 +' + fmtNum(reward), 3600);
+    $('guide').hidden = true;
+    renderAll(); save();
+  }
+  function away(dt) {
+    var sec = Math.min(dt, 28800);
+    var g = cpsBase() * sec * 0.5;
+    if (g > 0) gain(g);
+    if (sec >= 60 && g >= 1) toast('留守のあいだに光が ' + fmtNum(g) + ' 集まりました', 6000);
+  }
+
+  // ---------- 追い風(報酬型広告) ----------
+  // リワード広告(広告を見て光2倍)を使うときだけ true にする。
+  var REWARDED_ADS = true;
+  var BOOST_MS = 3 * 60 * 1000, AD_SECONDS = 15;
+  var adTimer = 0, adOnReward = null;
+  // 忍者AdMaxの広告タグ(この「広告を見る」ボタン専用、300x250で作成)。広告を見るたびに読み込み直す。
+  var REWARD_AD_TAG_SRC = 'https://adm.shinobi.jp/s/ed16ad69ab02a6f748812ab596479a7b';
+
+  function boostMult() {
+    var m = 1;
+    if (Date.now() < state.boostUntil) m *= 2;
+    if (goldenActive()) m *= 1.5;
+    return m;
+  }
+  function startBoost() {
+    state.boostUntil = Date.now() + BOOST_MS;
+    toast('追い風が吹いています。3分間、光が2倍になります。', 4200);
+    renderAll(); save();
+  }
+
+  // 広告枠に忍者AdMaxのタグを差し込む。
+  // この手の広告タグは document.write でページに書き込む仕組みのものが多く、
+  // ページ読み込み後にJSで動的に<script>を足しても書き込み先がなく表示されないことがある。
+  // そこで専用のiframeを作り、その「最初の読み込み」としてタグを書き込むことで、
+  // document.write が効く状態を毎回作ってから読み込み直す。
+  function loadRewardAd() {
+    var body = $('rewardAdBody');
+    body.innerHTML = '';
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:300px;max-width:100%;height:250px;border:0;display:block;';
+    iframe.setAttribute('scrolling', 'no');
+    body.appendChild(iframe);
+    var doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(
+      '<!doctype html><html><head><meta charset="utf-8">' +
+      '<style>html,body{margin:0;padding:0;display:flex;justify-content:center;align-items:center;background:transparent;overflow:hidden;}</style>' +
+      '</head><body><script src="' + REWARD_AD_TAG_SRC + '"><' + '/script></body></html>'
+    );
+    doc.close();
+  }
+
+  // 広告を見終わる(＝待ち終わる)と onReward() を呼ぶ。広告そのもののクリックは求めない。
+  function showRewardedAd(onReward) {
+    var go = $('adGo'), fill = $('adFill'), t0 = Date.now();
+    adOnReward = onReward;
+    go.disabled = true; fill.style.width = '0%';
+    go.textContent = 'あと ' + AD_SECONDS + ' 秒';
+    loadRewardAd();
+    $('adLayer').hidden = false;
+    clearInterval(adTimer);
+    adTimer = setInterval(function () {
+      var el = (Date.now() - t0) / 1000;
+      fill.style.width = Math.min(100, el / AD_SECONDS * 100) + '%';
+      if (el >= AD_SECONDS) {
+        clearInterval(adTimer);
+        go.disabled = false; go.textContent = '追い風を受け取る';
+      } else {
+        go.textContent = 'あと ' + Math.ceil(AD_SECONDS - el) + ' 秒';
+      }
+    }, 100);
+  }
+  function closeAd(rewarded) {
+    clearInterval(adTimer);
+    $('adLayer').hidden = true;
+    $('rewardAdBody').innerHTML = '';
+    var cb = adOnReward;
+    adOnReward = null;
+    if (rewarded && cb) cb();
+  }
+  function renderBoost() {
+    var box = $('boost'), on = state.boostUntil - Date.now() > 0;
+    var show = REWARDED_ADS && (state.total >= 50 || on);
+    box.hidden = !show;
+    if (!show) return;
+    box.dataset.on = on ? 'true' : 'false';
+    $('boostTitle').textContent = on ? '追い風 光2倍' : '追い風を呼ぶ';
+    if (on) {
+      var s = Math.ceil((state.boostUntil - Date.now()) / 1000);
+      $('boostSub').textContent = '残り ' + Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+    } else {
+      $('boostSub').textContent = '広告を見ると、3分間 光が2倍になります。';
+    }
+    var b = $('boostBtn');
+    b.disabled = on;
+    b.textContent = on ? '適用中' : '広告を見る';
+  }
+
+  // ---------- BGM(ローファイ、すべてその場で合成) ----------
+  var NOTE_FREQ = {
+    C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
+    C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88
+  };
+  var BGM_CHORDS = [
+    ['F3', 'A3', 'C4', 'E4'],
+    ['E3', 'G3', 'B3', 'D4'],
+    ['D3', 'F3', 'A3', 'C4'],
+    ['C3', 'E3', 'G3', 'B3']
+  ];
+  var BAR_SEC = 3.2; // 4拍 x 0.8秒、ゆったり75前後のテンポ
+  var bgmOn = false, bgmCtx = null, bgmMaster = null, bgmSchedTimer = null;
+  var bgmNextTime = 0, bgmBarIndex = 0;
+
+  function bgmNoiseBuffer(ctx, sec) {
+    var buf = ctx.createBuffer(1, Math.round(ctx.sampleRate * sec), ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+  function bgmPad(freq, t, dur, pan) {
+    var ctx = bgmCtx;
+    var osc1 = ctx.createOscillator(), osc2 = ctx.createOscillator();
+    var filt = ctx.createBiquadFilter(), g = ctx.createGain(), p = ctx.createStereoPanner();
+    osc1.type = 'triangle'; osc2.type = 'sine';
+    osc1.frequency.value = freq; osc2.frequency.value = freq * 1.004; // わずかにデチューンして厚みを出す
+    filt.type = 'lowpass'; filt.frequency.value = 950; filt.Q.value = 0.3;
+    p.pan.value = pan;
+    var peak = 0.09;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.7);
+    g.gain.setValueAtTime(peak, t + dur - 0.9);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    osc1.connect(filt); osc2.connect(filt); filt.connect(g); g.connect(p); p.connect(bgmMaster);
+    osc1.start(t); osc2.start(t); osc1.stop(t + dur + 0.05); osc2.stop(t + dur + 0.05);
+  }
+  function bgmKick(t) {
+    var ctx = bgmCtx;
+    var osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(110, t);
+    osc.frequency.exponentialRampToValueAtTime(42, t + 0.22);
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+    osc.connect(g); g.connect(bgmMaster);
+    osc.start(t); osc.stop(t + 0.34);
+  }
+  function bgmHat(t) {
+    var ctx = bgmCtx;
+    var src = ctx.createBufferSource();
+    src.buffer = bgmCtx._hatBuf || (bgmCtx._hatBuf = bgmNoiseBuffer(ctx, 0.08));
+    var filt = ctx.createBiquadFilter(), g = ctx.createGain();
+    filt.type = 'highpass'; filt.frequency.value = 6500;
+    g.gain.setValueAtTime(0.045, t);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.06);
+    src.connect(filt); filt.connect(g); g.connect(bgmMaster);
+    src.start(t); src.stop(t + 0.07);
+  }
+  function bgmScheduleBar(idx, t) {
+    var chord = BGM_CHORDS[idx % BGM_CHORDS.length];
+    var pans = [-0.25, -0.08, 0.08, 0.25];
+    chord.forEach(function (note, i) { bgmPad(NOTE_FREQ[note], t, BAR_SEC, pans[i % pans.length]); });
+    bgmKick(t);
+    bgmHat(t + 0.8); bgmHat(t + 1.6); bgmHat(t + 2.4);
+  }
+  function bgmScheduler() {
+    while (bgmNextTime < bgmCtx.currentTime + 0.15) {
+      bgmScheduleBar(bgmBarIndex, bgmNextTime);
+      bgmNextTime += BAR_SEC;
+      bgmBarIndex++;
+    }
+  }
+  function bgmStartCrackle() {
+    var ctx = bgmCtx;
+    var src = ctx.createBufferSource();
+    src.buffer = bgmNoiseBuffer(ctx, 4);
+    src.loop = true;
+    var filt = ctx.createBiquadFilter(), g = ctx.createGain();
+    filt.type = 'highpass'; filt.frequency.value = 2200;
+    g.gain.value = 0.012;
+    src.connect(filt); filt.connect(g); g.connect(bgmMaster);
+    src.start();
+  }
+  function bgmEnsure() {
+    if (bgmCtx) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    bgmCtx = new AC();
+    bgmMaster = bgmCtx.createGain();
+    bgmMaster.gain.value = 0;
+    bgmMaster.connect(bgmCtx.destination);
+    bgmStartCrackle();
+  }
+  function toggleBgm() {
+    bgmEnsure();
+    if (!bgmCtx) { toast('この端末ではBGMを再生できません。', 2600); return; }
+    bgmOn = !bgmOn;
+    $('bgmBtn').setAttribute('aria-pressed', bgmOn ? 'true' : 'false');
+    if (bgmOn) {
+      if (bgmCtx.state === 'suspended') bgmCtx.resume();
+      bgmNextTime = bgmCtx.currentTime + 0.05;
+      bgmBarIndex = 0;
+      bgmScheduler();
+      bgmSchedTimer = setInterval(bgmScheduler, 100);
+      bgmMaster.gain.cancelScheduledValues(bgmCtx.currentTime);
+      bgmMaster.gain.linearRampToValueAtTime(0.55, bgmCtx.currentTime + 0.6);
+    } else {
+      clearInterval(bgmSchedTimer);
+      bgmMaster.gain.cancelScheduledValues(bgmCtx.currentTime);
+      bgmMaster.gain.linearRampToValueAtTime(0, bgmCtx.currentTime + 0.4);
+    }
+  }
+  function bgmOnHidden(hidden) {
+    if (!bgmCtx) return;
+    if (hidden) { try { bgmCtx.suspend(); } catch (e) {} }
+    else if (bgmOn) { try { bgmCtx.resume(); } catch (e) {} }
+  }
+
+  // ---------- 画面の更新 ----------
+  var genEls = {}, teaserEl = null, upList = $('upList'), genList = $('genList');
+
+  function buildGens() {
+    genList.innerHTML = '';
+    GENS.forEach(function (g) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'row'; b.hidden = true;
+      b.innerHTML = '<span class="own">0</span>' +
+        '<span class="info"><span class="name">' + g.name + '</span><span class="desc">' + g.desc + '</span><span class="rate"></span></span>' +
+        '<span class="buy"><span class="cost"></span><span class="unit"></span></span>';
+      b.addEventListener('click', function () { buyGen(g.id); });
+      genList.appendChild(b);
+      genEls[g.id] = {
+        row: b, own: b.querySelector('.own'), rate: b.querySelector('.rate'),
+        cost: b.querySelector('.cost'), unit: b.querySelector('.unit')
+      };
+    });
+    teaserEl = document.createElement('div');
+    teaserEl.className = 'row locked'; teaserEl.hidden = true;
+    teaserEl.innerHTML = '<span class="own">?</span><span class="info"><span class="name">？？？</span><span class="desc">もっと光を集めると、新しい設備が見えてきます。</span></span><span></span>';
+    genList.appendChild(teaserEl);
+  }
+
+  function genShown(i) {
+    var g = GENS[i];
+    return i === 0 || state.owned[GENS[i - 1].id] > 0 || state.owned[g.id] > 0 || state.total >= g.base * 0.5;
+  }
+
+  function renderGens() {
+    var teaserShown = false;
+    GENS.forEach(function (g, i) {
+      var e = genEls[g.id], own = state.owned[g.id];
+      var show = genShown(i);
+      e.row.hidden = !show;
+      if (!show) {
+        if (!teaserShown) { teaserShown = true; }
+        return;
+      }
+      var p = plan(g), ok = state.light >= p.cost, u = unit(g);
+      e.own.textContent = own;
+      e.rate.textContent = '各 +' + fmtNum(u) + '/秒' + (own > 0 ? ' ・ 計 ' + fmtNum(own * u) + '/秒' : '');
+      e.cost.textContent = fmtNum(p.cost);
+      e.unit.textContent = p.n > 1 ? '光 ×' + p.n : '光';
+      e.row.classList.toggle('afford', ok);
+      e.row.disabled = !ok;
+    });
+    teaserEl.hidden = !teaserShown;
+  }
+
+  function visibleUps() {
+    return UPS.filter(function (u) {
+      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] > 0);
+    }).sort(function (a, b) { return a.cost - b.cost; });
+  }
+  function renderUps() {
+    var list = visibleUps(), sig = list.map(function (u) { return u.id; }).join(',');
+    if (sig !== upSig) {
+      upSig = sig;
+      upList.innerHTML = '';
+      if (!list.length) {
+        var p = document.createElement('p');
+        p.className = 'empty';
+        p.textContent = 'いま買える強化はありません。光を集めて設備を増やすと、新しい道具が並びます。';
+        upList.appendChild(p);
+      }
+      list.forEach(function (u) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'row kind'; b.dataset.id = u.id;
+        var tag = u.tap || u.share ? '磨' : u.gen ? '設' : '全';
+        b.innerHTML = '<span class="own">' + tag + '</span>' +
+          '<span class="info"><span class="name">' + u.name + '</span><span class="desc">' + u.desc + '</span></span>' +
+          '<span class="buy"><span class="cost">' + fmtNum(u.cost) + '</span><span class="unit">光</span></span>';
+        b.addEventListener('click', function () { buyUp(u.id); });
+        upList.appendChild(b);
+      });
+    }
+    var rows = upList.querySelectorAll('.row'), canBuy = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var ok = state.light >= UMAP[rows[i].dataset.id].cost;
+      if (ok) canBuy++;
+      rows[i].classList.toggle('afford', ok);
+      rows[i].disabled = !ok;
+    }
+    $('upDot').hidden = upList.hidden === false || canBuy === 0;
+    var bought = UPS.filter(function (u) { return state.ups[u.id]; }).length;
+    $('upCount').textContent = bought + '/' + UPS.length;
+  }
+
+  // 次の目標: まだ持っていない設備と買える強化のうち、いちばん安いもの。買えるものがあれば知らせる。
+  function renderGoal() {
+    var cands = [], i;
+    for (i = 0; i < GENS.length; i++) {
+      if (genShown(i) && state.owned[GENS[i].id] === 0) { cands.push({ name: GENS[i].name, cost: GENS[i].base }); break; }
+    }
+    visibleUps().forEach(function (u) { cands.push({ name: u.name, cost: u.cost }); });
+    if (!cands.length) {
+      GENS.forEach(function (g) { cands.push({ name: g.name, cost: Math.ceil(g.base * Math.pow(1.15, state.owned[g.id])) }); });
+    }
+    var ready = cands.filter(function (c) { return c.cost <= state.light; });
+    var pick, left, pct;
+    if (ready.length) {
+      ready.sort(function (a, b) { return b.cost - a.cost; });
+      pick = ready[0]; left = 'いま買えます'; pct = 100;
+    } else {
+      cands.sort(function (a, b) { return a.cost - b.cost; });
+      pick = cands[0];
+      left = 'あと ' + fmtNum(Math.ceil(pick.cost - state.light)) + ' 光';
+      pct = Math.min(100, state.light / pick.cost * 100);
+    }
+    $('goal').dataset.ready = ready.length ? 'true' : 'false';
+    $('goalName').textContent = pick.name;
+    $('goalLeft').textContent = left;
+    $('goalFill').style.width = pct + '%';
+  }
+
+  var uiLast = '';
+  function renderAll() {
+    var c = cps();
+    rangeNow = rangeOf(state.total);
+    var ri = rankIdx(rangeNow);
+    if (ri > state.rank) {
+      state.rank = ri;
+      toast('灯台の格が上がりました。' + RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
+    }
+    $('light').textContent = fmtNum(Math.floor(state.light));
+    var bm = boostMult();
+    var bmLabel = bm % 1 === 0 ? String(bm) : bm.toFixed(1);
+    $('cps').textContent = '毎秒 ' + fmtNum(c) + (bm > 1 ? '  ' + (goldenActive() ? '✨' : '') + 'ブースト ×' + bmLabel : '');
+    $('tapGain').textContent = '+' + fmtNum(tapPower());
+    $('rankName').textContent = RANKS[ri][1];
+    $('rangeVal').textContent = rangeNow.toFixed(1);
+    $('stGuided').textContent = state.guided + '隻';
+    $('stTaps').textContent = state.taps.toLocaleString('ja-JP') + '回';
+    $('stTotal').textContent = fmtNum(Math.floor(state.total));
+    $('hint').hidden = state.guided >= 1 || state.taps >= 100;
+    renderGens();
+    renderUps();
+    renderBoost();
+    renderGoal();
+  }
+
+  // ---------- タップ可否の判定(全画面背景化でUIカードが海に重なるため、
+  // 実際にタップが届く場所かどうかを document.elementFromPoint で確認する) ----------
+  function pointOpen(fx, fy) {
+    var rect = cv.getBoundingClientRect();
+    var vx = rect.left + W * fx, vy = rect.top + H * fy;
+    if (vx < 0 || vy < 0 || vx > window.innerWidth || vy > window.innerHeight) return false;
+    var el = document.elementFromPoint(vx, vy);
+    return el === cv;
+  }
+  function lineOpen(fy) {
+    var xs = [0.08, 0.3, 0.5, 0.7, 0.92];
+    for (var i = 0; i < xs.length; i++) { if (!pointOpen(xs[i], fy)) return false; }
+    return true;
+  }
+  function pickOpenLineY(fyFrom, fyTo, tries) {
+    for (var i = 0; i < tries; i++) {
+      var fy = fyFrom + (fyTo - fyFrom) * Math.random();
+      if (lineOpen(fy)) return fy;
+    }
+    return null;
+  }
+  function pickOpenSpot(fyFrom, fyTo, tries) {
+    for (var i = 0; i < tries; i++) {
+      var fx = 0.12 + 0.76 * Math.random(), fy = fyFrom + (fyTo - fyFrom) * Math.random();
+      if (pointOpen(fx, fy)) return { x: W * fx, y: H * fy };
+    }
+    return null;
+  }
+
+  // ---------- 船 ----------
+  function seaBottom() { return H * 0.78; }
+  function spawnShip(isBonus) {
+    var dir = Math.random() < 0.5 ? 1 : -1;
+    var kinds = ['cargo', 'fish', 'sail'];
+    var y;
+    if (isBonus) {
+      var fy = pickOpenLineY(horizon / H, seaBottom() / H, 24);
+      y = fy != null ? H * fy : horizon + (seaBottom() - horizon) * (0.14 + Math.random() * 0.78);
+    } else {
+      y = horizon + (seaBottom() - horizon) * (0.14 + Math.random() * 0.78);
+    }
+    var s = {
+      x: dir > 0 ? -60 : W + 60, y: y, dir: dir,
+      speed: isBonus ? W / 22 : W / (30 + Math.random() * 40),
+      kind: kinds[Math.floor(Math.random() * 3)], ph: Math.random() * 6.28,
+      bonus: isBonus, done: false, lit: false, hit: 30
+    };
+    ships.push(s);
+    if (isBonus) { bonus = s; $('guide').hidden = false; }
+    return s;
+  }
+  function ambientTarget() { return 1 + Math.min(4, Math.floor((rangeNow - 3) / 4)); }
+  function seedShips() {
+    ships = []; bonus = null;
+    $('guide').hidden = true;
+    var n = ambientTarget();
+    for (var i = 0; i < n; i++) {
+      var s = spawnShip(false);
+      s.x = W * (0.1 + 0.8 * Math.random());
+    }
+  }
+  function updateShips(dt) {
+    ships = ships.filter(function (s) {
+      s.x += s.dir * s.speed * dt;
+      var gone = (s.dir > 0 && s.x > W + 70) || (s.dir < 0 && s.x < -70);
+      if (gone && s === bonus) {
+        bonus = null; nextBonus = 25 + Math.random() * 25;
+        $('guide').hidden = true;
+      }
+      return !gone;
+    });
+    ambientTimer -= dt;
+    if (ambientTimer <= 0) {
+      var count = ships.filter(function (s) { return !s.bonus; }).length;
+      if (count < ambientTarget()) spawnShip(false);
+      ambientTimer = 2 + Math.random() * 4;
+    }
+    if (!bonus) {
+      nextBonus -= dt;
+      if (nextBonus <= 0) spawnShip(true);
+    }
+  }
+
+  // ---------- 岩陰のたこ ----------
+  function creatureSpot() {
+    var sp = pickOpenSpot(0.62, 0.93, 40);
+    if (sp) return sp;
+    return { x: W * (0.16 + 0.68 * Math.random()), y: H * (0.8 + Math.random() * 0.055) };
+  }
+  function spawnCreature() {
+    var sp = creatureSpot();
+    creature = { x: sp.x, y: sp.y, age: 0, ttl: 7 + Math.random() * 3, hit: 24, ph: Math.random() * 6.28 };
+  }
+  function updateCreature(dt) {
+    if (creature) {
+      creature.age += dt;
+      if (creature.age > creature.ttl) creature = null;
+    } else {
+      nextCreature -= dt;
+      if (nextCreature <= 0) {
+        spawnCreature();
+        nextCreature = 55 + Math.random() * 55;
+      }
+    }
+  }
+  function pokeCreature() {
+    if (!creature) return;
+    var reward = Math.max(20, cps() * 8);
+    gain(reward);
+    state.found++;
+    addFloater(creature.x, creature.y - 20, '+' + fmtNum(reward));
+    toast('岩陰にいたタコを見つけた。光 +' + fmtNum(reward), 3200);
+    creature = null;
+    renderAll(); save();
+  }
+
+  // ---------- 描画 ----------
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeStars() {
+    var r = rng(7), n = Math.round(W * H / 2600);
+    stars = [];
+    for (var i = 0; i < n; i++) {
+      stars.push({ x: r() * W, y: r() * horizon * 0.8, r: 0.6 + r() * 1.1, ph: r() * 6.28, sp: 0.5 + r() * 1.5 });
+    }
+  }
+  function makeSparkles() {
+    var r = rng(19), n = Math.round(W * (seaBottom() - horizon) / 5200);
+    sparkles = [];
+    for (var i = 0; i < n; i++) {
+      sparkles.push({ x: r() * W, y: horizon + r() * (seaBottom() - horizon), r: 0.5 + r() * 0.8, ph: r() * 6.28, sp: 0.6 + r() * 1.3 });
+    }
+  }
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    if (!r.width) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    horizon = H * 0.6; lampX = W * 0.5; lampY = H * 0.29;
+    makeStars();
+    makeSparkles();
+    if (state) seedShips();
+  }
+
+  function drawSky(t, ph) {
+    var sc0 = SKY_COLORS[ph.from], sc1 = SKY_COLORS[ph.to];
+    var g = ctx.createLinearGradient(0, 0, 0, horizon);
+    g.addColorStop(0, lerpColor(sc0[0], sc1[0], ph.t));
+    g.addColorStop(0.5, lerpColor(sc0[1], sc1[1], ph.t));
+    g.addColorStop(0.85, lerpColor(sc0[2], sc1[2], ph.t));
+    g.addColorStop(1, lerpColor(sc0[3], sc1[3], ph.t));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, horizon + 1);
+    var starVis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
+    ctx.fillStyle = '#fff6e0';
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var a = reduce ? 0.65 : 0.45 + 0.35 * Math.sin(t * s.sp + s.ph);
+      ctx.globalAlpha = Math.max(0, a * (1 - s.y / (horizon * 0.9)) * starVis);
+      ctx.fillRect(s.x, s.y, s.r, s.r);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,196,170,0.10)';
+    for (var j = 0; j < 3; j++) {
+      var sp = reduce ? 0 : 4 + j * 2, span = W + 240;
+      var x = ((j * W * 0.45 + t * sp) % span) - 120;
+      ctx.beginPath();
+      ctx.ellipse(x, horizon * (0.62 + j * 0.1), 90 + j * 30, 5 + j * 2, 0, 0, 6.283);
+      ctx.fill();
+    }
+    drawMoon(ph);
+    drawShoot();
+  }
+  // ---------- 月・星屑・流れ星(神秘的な演出) ----------
+  function moonPos() {
+    var frac = (dayT % DAY_CYCLE_SEC) / DAY_CYCLE_SEC;
+    return {
+      x: W * frac,
+      y: horizon * (0.14 + 0.06 * Math.sin(frac * 6.283 + 1.1))
+    };
+  }
+  function drawMoon(ph) {
+    var a = lerpN(MOON_VIS[ph.from], MOON_VIS[ph.to], ph.t);
+    if (a <= 0.02) { lastMoon = null; return; }
+    var m = moonPos(), r = Math.max(13, W * 0.042);
+    ctx.save();
+    ctx.globalAlpha = a;
+    var halo = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r * 4.4);
+    halo.addColorStop(0, 'rgba(228,234,255,0.32)');
+    halo.addColorStop(1, 'rgba(228,234,255,0)');
+    ctx.fillStyle = halo;
+    ctx.fillRect(m.x - r * 4.4, m.y - r * 4.4, r * 8.8, r * 8.8);
+    var g = ctx.createRadialGradient(m.x - r * 0.32, m.y - r * 0.3, r * 0.1, m.x, m.y, r);
+    g.addColorStop(0, '#fbfbff'); g.addColorStop(1, '#ccd5ee');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = a * 0.16; ctx.fillStyle = '#95a0c4';
+    ctx.beginPath(); ctx.arc(m.x - r * 0.3, m.y - r * 0.2, r * 0.22, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(m.x + r * 0.26, m.y + r * 0.26, r * 0.16, 0, 6.283); ctx.fill();
+    ctx.restore();
+    lastMoon = { x: m.x, a: a };
+  }
+  function updateShoot(dt, ph) {
+    var nightish = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
+    if (shootStar) {
+      shootStar.age += dt;
+      if (shootStar.age > shootStar.dur) shootStar = null;
+    } else if (nightish > 0.5 && !reduce) {
+      nextShoot -= dt;
+      if (nextShoot <= 0) {
+        var dir = Math.random() < 0.5 ? 1 : -1;
+        shootStar = {
+          x: dir > 0 ? -W * 0.05 : W * 1.05, y: horizon * (0.06 + Math.random() * 0.32),
+          dir: dir, len: W * (0.16 + Math.random() * 0.1),
+          slope: 0.22 + Math.random() * 0.18, dur: 0.6 + Math.random() * 0.3, age: 0
+        };
+        nextShoot = 16 + Math.random() * 28;
+      }
+    } else {
+      nextShoot = Math.max(nextShoot, 3);
+    }
+  }
+  function drawShoot() {
+    if (!shootStar) return;
+    var s = shootStar, k = Math.min(1, s.age / s.dur);
+    var a = Math.sin(k * Math.PI);
+    var hx = s.x + s.dir * s.len * k, hy = s.y + s.len * s.slope * k;
+    var tx = hx - s.dir * s.len * 0.32, ty = hy - s.len * s.slope * 0.32;
+    var g = ctx.createLinearGradient(tx, ty, hx, hy);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(255,255,255,' + Math.max(0, 0.9 * a) + ')');
+    ctx.strokeStyle = g; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+  }
+  function drawMoonGlitter(t) {
+    if (!lastMoon || lastMoon.a <= 0.05) return;
+    var mx = lastMoon.x, a = lastMoon.a, rows = 9;
+    for (var i = 0; i < rows; i++) {
+      var y = horizon + (seaBottom() - horizon) * (i + 0.5) / rows;
+      var spread = 6 + i * 2.4;
+      var wob = reduce ? 0 : Math.sin(t * 1.6 + i * 1.3) * spread * 0.4;
+      var w = 9 + i * 2.2;
+      var al = a * (0.3 - i * 0.022) * (0.6 + 0.4 * (reduce ? 1 : Math.sin(t * 2.2 + i)));
+      if (al <= 0) continue;
+      ctx.fillStyle = 'rgba(228,234,255,' + al + ')';
+      ctx.fillRect(mx + wob - w / 2, y, w, 1.6);
+    }
+  }
+  function drawSparkles(t, ph) {
+    var vis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
+    if (vis <= 0.03) return;
+    ctx.fillStyle = 'rgba(185,255,232,1)';
+    for (var i = 0; i < sparkles.length; i++) {
+      var sp = sparkles[i];
+      var a = (0.18 + 0.32 * (reduce ? 0.6 : Math.sin(t * sp.sp + sp.ph))) * vis;
+      if (a <= 0) continue;
+      ctx.globalAlpha = a;
+      ctx.fillRect(sp.x, sp.y, sp.r, sp.r);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawSea(t, ph) {
+    var sc0 = SEA_COLORS[ph.from], sc1 = SEA_COLORS[ph.to];
+    var g = ctx.createLinearGradient(0, horizon, 0, H);
+    g.addColorStop(0, lerpColor(sc0[0], sc1[0], ph.t));
+    g.addColorStop(0.35, lerpColor(sc0[1], sc1[1], ph.t));
+    g.addColorStop(1, lerpColor(sc0[2], sc1[2], ph.t));
+    ctx.fillStyle = g; ctx.fillRect(0, horizon, W, H - horizon);
+    ctx.fillStyle = 'rgba(240,170,130,0.35)'; ctx.fillRect(0, horizon, W, 1.5);
+    ctx.lineWidth = 1;
+    for (var i = 0; i < 7; i++) {
+      var y = horizon + (seaBottom() - horizon) * (i + 0.6) / 7;
+      ctx.strokeStyle = 'rgba(180,210,230,' + (0.05 + 0.015 * i) + ')';
+      ctx.beginPath();
+      for (var x = 0; x <= W; x += 12) {
+        var yy = y + Math.sin(x * 0.03 + (reduce ? 0 : t * 0.8) + i * 1.7) * 1.6;
+        if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    drawMoonGlitter(t);
+    drawSparkles(t, ph);
+  }
+  function lightDot(x, y, r, rgb, a) {
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
+    g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r * 5, y - r * 5, r * 10, r * 10);
+    ctx.fillStyle = 'rgba(' + rgb + ',1)';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+  }
+  function drawShip(s, t) {
+    var u = Math.max(0.8, Math.min(1.4, W / 400));
+    var k = Math.max(0, Math.min(1, (s.y - horizon) / (seaBottom() - horizon)));
+    var sc = (0.75 + 0.7 * k) * u;
+    var bob = reduce ? 0 : Math.sin(t * 1.3 + s.ph) * 1.4;
+    var lx, ly;
+    ctx.save();
+    ctx.translate(s.x, s.y + bob);
+    ctx.scale(s.dir * sc, sc);
+    ctx.fillStyle = s.lit ? '#b9c7cb' : '#0a1722';
+    ctx.beginPath();
+    if (s.kind === 'cargo') {
+      ctx.moveTo(-24, -8); ctx.lineTo(27, -8); ctx.lineTo(21, 0); ctx.lineTo(-22, 0); ctx.closePath(); ctx.fill();
+      ctx.fillRect(-22, -20, 10, 12); ctx.fillRect(-8, -13, 8, 5); ctx.fillRect(1, -13, 8, 5); ctx.fillRect(-4, -18, 8, 5);
+      lx = -17; ly = -23;
+    } else if (s.kind === 'fish') {
+      ctx.moveTo(-13, -6); ctx.lineTo(14, -6); ctx.lineTo(9, 0); ctx.lineTo(-11, 0); ctx.closePath(); ctx.fill();
+      ctx.fillRect(-9, -13, 8, 7); ctx.fillRect(5.5, -17, 1, 11);
+      lx = 6; ly = -18;
+    } else {
+      ctx.moveTo(-12, -4); ctx.lineTo(12, -4); ctx.lineTo(9, 0); ctx.lineTo(-9, 0); ctx.closePath(); ctx.fill();
+      ctx.fillRect(-0.5, -26, 1, 22);
+      ctx.fillStyle = s.lit ? '#e8eef0' : '#22364a';
+      ctx.beginPath(); ctx.moveTo(1.5, -25); ctx.lineTo(1.5, -6); ctx.lineTo(14, -6); ctx.closePath(); ctx.fill();
+      lx = 0; ly = -28;
+    }
+    ctx.restore();
+    s.y0 = s.y + bob; s.sc = sc; s.hit = 38 * sc;
+    var rgb = s.bonus && !s.done ? '255,214,138' : s.done ? '140,230,170' : '255,244,207';
+    var a = s.bonus && !s.done ? 0.6 + 0.4 * Math.sin(t * 5) : 0.8;
+    lightDot(s.x + s.dir * lx * sc, s.y0 + ly * sc, 1.7 * sc, rgb, a);
+  }
+  function drawIsland() {
+    var g = ctx.createLinearGradient(0, H * 0.8, 0, H);
+    g.addColorStop(0, '#14293a'); g.addColorStop(1, '#08131d');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.12, H); ctx.lineTo(W * 0.28, H * 0.88);
+    ctx.quadraticCurveTo(W * 0.36, H * 0.8, W * 0.42, H * 0.8);
+    ctx.lineTo(W * 0.58, H * 0.8);
+    ctx.quadraticCurveTo(W * 0.64, H * 0.8, W * 0.72, H * 0.88);
+    ctx.lineTo(W * 0.88, H); ctx.closePath(); ctx.fill();
+  }
+  function drawCreature(t) {
+    if (!creature) return;
+    var c = creature;
+    var a = Math.min(1, c.age / 0.5, (c.ttl - c.age) / 0.6);
+    if (a <= 0) return;
+    var u = Math.max(0.8, Math.min(1.3, W / 400));
+    var bob = reduce ? 0 : Math.sin(t * 2 + c.ph) * 2;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(c.x, c.y + bob);
+    ctx.scale(u, u);
+    ctx.fillStyle = '#9c5a78';
+    ctx.strokeStyle = '#9c5a78';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    for (var i = -2; i <= 2; i++) {
+      var wob = reduce ? 0 : Math.sin(t * 3 + c.ph + i) * 2.4;
+      ctx.beginPath();
+      ctx.moveTo(i * 3.2, -5);
+      ctx.quadraticCurveTo(i * 5 + wob, 4, i * 4 + wob * 0.6, 10);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 11, 9, 0, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle = '#2a1522';
+    ctx.beginPath(); ctx.arc(-4, -11, 1.3, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(4, -11, 1.3, 0, 6.283); ctx.fill();
+    ctx.restore();
+    c.y0 = c.y + bob; c.sc = u; c.hit = 24 * u;
+  }
+  function drawTower() {
+    var topY = H * 0.33, baseY = H * 0.8, tw1 = W * 0.032, tw2 = W * 0.05;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(lampX - tw1, topY); ctx.lineTo(lampX + tw1, topY);
+    ctx.lineTo(lampX + tw2, baseY); ctx.lineTo(lampX - tw2, baseY); ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = '#e9eef0'; ctx.fillRect(0, topY, W, baseY - topY);
+    ctx.fillStyle = '#b9483a';
+    ctx.fillRect(0, topY + (baseY - topY) * 0.4, W, (baseY - topY) * 0.18);
+    ctx.fillStyle = 'rgba(20,40,60,0.2)'; ctx.fillRect(lampX, topY, W, baseY - topY);
+    ctx.restore();
+    ctx.fillStyle = '#2a3b4d';
+    ctx.fillRect(lampX - W * 0.045, H * 0.325, W * 0.09, 4);
+    var lw = W * 0.027, ltop = H * 0.255, lh = H * 0.07;
+    var c = 'rgb(255,' + Math.round(214 + 30 * pulse) + ',' + Math.round(138 + 70 * pulse) + ')';
+    ctx.fillStyle = c; ctx.fillRect(lampX - lw, ltop, lw * 2, lh);
+    ctx.fillStyle = '#2a3b4d';
+    ctx.fillRect(lampX - lw, ltop, 2, lh); ctx.fillRect(lampX - 1, ltop, 2, lh); ctx.fillRect(lampX + lw - 2, ltop, 2, lh);
+    ctx.fillStyle = '#1d2c3b';
+    ctx.beginPath();
+    ctx.moveTo(lampX - lw - 4, ltop); ctx.lineTo(lampX, H * 0.215); ctx.lineTo(lampX + lw + 4, ltop); ctx.closePath(); ctx.fill();
+    ctx.fillRect(lampX - 1, H * 0.2, 2, H * 0.02);
+  }
+  function drawBeam(dir, len) {
+    if (len < 2) return;
+    var g = ctx.createLinearGradient(lampX, lampY, lampX + dir * len, lampY);
+    g.addColorStop(0, 'rgba(255,230,170,0.75)'); g.addColorStop(1, 'rgba(255,230,170,0)');
+    ctx.fillStyle = g;
+    var tilt = len * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(lampX, lampY - 2);
+    ctx.lineTo(lampX + dir * len, lampY - len * 0.07 + tilt);
+    ctx.lineTo(lampX + dir * len, lampY + len * 0.07 + tilt);
+    ctx.lineTo(lampX, lampY + 2);
+    ctx.closePath(); ctx.fill();
+  }
+  function drawGlow(flash) {
+    var r = W * 0.16 * (1 + pulse * 0.4);
+    var g = ctx.createRadialGradient(lampX, lampY, 0, lampX, lampY, r);
+    g.addColorStop(0, 'rgba(255,240,200,' + Math.min(1, 0.55 + 0.3 * flash + 0.25 * pulse) + ')');
+    g.addColorStop(0.25, 'rgba(255,214,138,0.25)');
+    g.addColorStop(1, 'rgba(255,214,138,0)');
+    ctx.fillStyle = g; ctx.fillRect(lampX - r, lampY - r, r * 2, r * 2);
+  }
+  function drawOverlays(t) {
+    if (bonus && !bonus.done) {
+      var s = bonus, rr = (20 + (reduce ? 0 : 4 * Math.sin(t * 4))) * s.sc;
+      ctx.strokeStyle = 'rgba(255,214,138,0.85)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(s.x, s.y0 - 10 * s.sc, rr, 0, 6.283); ctx.stroke();
+      if (state.guided < 3) {
+        ctx.font = "700 12px 'Zen Kaku Gothic New', sans-serif";
+        ctx.textAlign = 'center'; ctx.fillStyle = '#ffd68a';
+        ctx.fillText('タップで導く', s.x, s.y0 - 10 * s.sc - rr - 5);
+      }
+    }
+    if (creature && state.found < 3 && creature.age > 0.6 && creature.y0 != null) {
+      ctx.font = "700 12px 'Zen Kaku Gothic New', sans-serif";
+      ctx.textAlign = 'center'; ctx.fillStyle = '#ffb8d6';
+      ctx.fillText('そっとタップ', creature.x, creature.y0 - 24 * creature.sc);
+    }
+    ctx.textAlign = 'center';
+    ctx.font = "800 18px 'Shippori Mincho', serif";
+    for (var i = 0; i < floaters.length; i++) {
+      var f = floaters[i], a = Math.max(0, 1 - f.age / 0.9);
+      ctx.globalAlpha = a;
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,23,34,0.85)';
+      ctx.strokeText(f.text, f.x, f.y - f.age * 40);
+      ctx.fillStyle = '#ffd68a';
+      ctx.fillText(f.text, f.x, f.y - f.age * 40);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function draw(t) {
+    if (!W) return;
+    ctx.clearRect(0, 0, W, H);
+    var ph = dayBlend();
+    drawSky(t, ph); drawSea(t, ph);
+    var c = Math.cos(theta);
+    var frac = Math.max(0, Math.min(1, (rangeNow - 3) / 19));
+    var len = W * (0.28 + 0.62 * frac);
+    var rl = len * Math.pow(Math.max(0, c), 1.4), ll = len * Math.pow(Math.max(0, -c), 1.4);
+    for (var i = 0; i < ships.length; i++) {
+      var s = ships[i], d = s.x - lampX;
+      s.lit = Math.abs(d) < (d > 0 ? rl : ll) * 0.95;
+      drawShip(s, t);
+    }
+    drawIsland(); drawCreature(t); drawTower();
+    ctx.globalCompositeOperation = 'lighter';
+    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c));
+    ctx.globalCompositeOperation = 'source-over';
+    drawOverlays(t);
+  }
+
+  // ---------- メインループ ----------
+  var last = Date.now(), uiAcc = 0, saveAcc = 0;
+  function tick(dt) {
+    var c = cps();
+    if (c > 0 && dt > 0) gain(c * dt);
+    theta += ((reduce ? 0.35 : 0.9) + 0.08 * Math.sqrt(state.owned.clock || 0)) * dt;
+    pulse = Math.max(0, pulse - dt * 3);
+    dayT += dt;
+    var ph2 = dayBlend();
+    var golden = goldenActive();
+    if (golden && !goldenWas) toast('凪の恵み：しばらく光の産出が1.5倍になります', 4200);
+    goldenWas = golden;
+    updateShoot(dt, ph2);
+    updateShips(dt);
+    updateCreature(dt);
+    for (var i = floaters.length - 1; i >= 0; i--) {
+      floaters[i].age += dt;
+      if (floaters[i].age > 0.9) floaters.splice(i, 1);
+    }
+  }
+  function frame() {
+    var now = Date.now(), dt = (now - last) / 1000;
+    last = now;
+    if (dt < 0) dt = 0;
+    if (dt > 10) { away(dt); dt = 0; }
+    tick(dt);
+    draw(now / 1000);
+    uiAcc += dt; saveAcc += dt;
+    if (uiAcc >= 0.1) { uiAcc = 0; renderAll(); }
+    if (saveAcc >= 5) { saveAcc = 0; save(); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- 入力 ----------
+  function bind() {
+    cv.addEventListener('pointerdown', function (e) {
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      if (bonus && !bonus.done) {
+        var dx = x - bonus.x, dy = y - (bonus.y0 - 10 * bonus.sc);
+        if (Math.sqrt(dx * dx + dy * dy) < bonus.hit) { e.preventDefault(); guide(); return; }
+      }
+      if (creature && creature.y0 != null) {
+        var cdx = x - creature.x, cdy = y - creature.y0;
+        if (Math.sqrt(cdx * cdx + cdy * cdy) < creature.hit) { e.preventDefault(); pokeCreature(); return; }
+      }
+      if (Math.abs(x - lampX) < W * 0.09 && y > H * 0.19 && y < H * 0.82) { e.preventDefault(); polish(); }
+    });
+    // 磨くボタンは長押しで連打できる(押し続けると毎秒6回ほど)
+    var pb = $('polish'), holdWait = 0, holdRepeat = 0;
+    function stopHold() { clearTimeout(holdWait); clearInterval(holdRepeat); }
+    pb.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.preventDefault();
+      try { pb.setPointerCapture(e.pointerId); } catch (err) {}
+      polish();
+      stopHold();
+      holdWait = setTimeout(function () { holdRepeat = setInterval(polish, 170); }, 350);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (n) { pb.addEventListener(n, stopHold); });
+    pb.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    window.addEventListener('blur', stopHold);
+    pb.addEventListener('click', function (e) { if (e.detail === 0) polish(); });
+    $('guide').addEventListener('click', guide);
+    $('bgmBtn').addEventListener('click', toggleBgm);
+    $('rankBtn').addEventListener('click', function () {
+      var ri = rankIdx(rangeNow);
+      toast(RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
+    });
+    $('boostBtn').addEventListener('click', function () { showRewardedAd(startBoost); });
+    $('adGo').addEventListener('click', function () { closeAd(true); });
+    $('adCancel').addEventListener('click', function () { closeAd(false); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !$('adLayer').hidden) closeAd(false);
+    });
+
+    var tg = $('tabGen'), tu = $('tabUp'), qtyEl = $('qty');
+    function showTab(gen) {
+      tg.setAttribute('aria-selected', gen ? 'true' : 'false');
+      tu.setAttribute('aria-selected', gen ? 'false' : 'true');
+      genList.hidden = !gen; upList.hidden = gen; qtyEl.hidden = !gen;
+    }
+    tg.addEventListener('click', function () { showTab(true); });
+    tu.addEventListener('click', function () { showTab(false); });
+    qtyEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      qty = b.dataset.q === 'max' ? 'max' : parseInt(b.dataset.q, 10);
+      var all = qtyEl.querySelectorAll('button');
+      for (var i = 0; i < all.length; i++) all[i].setAttribute('aria-pressed', all[i] === b ? 'true' : 'false');
+      renderAll();
+    });
+
+    $('resetBtn').addEventListener('click', function () { $('resetAsk').hidden = false; $('resetBtn').hidden = true; });
+    $('resetNo').addEventListener('click', function () { $('resetAsk').hidden = true; $('resetBtn').hidden = false; });
+    $('resetYes').addEventListener('click', function () {
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      state = fresh(); upSig = null; floaters = []; theta = 0; nextBonus = 10;
+      seedShips(); renderAll();
+      $('resetAsk').hidden = true; $('resetBtn').hidden = false;
+      toast('最初から始めます。灯りをタップしよう。', 3600);
+    });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { stopHold(); if (state) save(); }
+      bgmOnHidden(document.hidden);
+    });
+    window.addEventListener('pagehide', function () { if (state) save(); });
+    if (window.ResizeObserver) new ResizeObserver(resize).observe(cv);
+    else window.addEventListener('resize', resize);
+  }
+
+  function start(data) {
+    var fromHot = data && data.state ? sanitize(data.state) : null;
+    var loaded = fromHot || load();
+    state = loaded || fresh();
+    buildGens();
+    bind();
+    resize();
+    if (!W) { W = 400; H = 300; horizon = H * 0.6; lampX = W * 0.5; lampY = H * 0.29; }
+    rangeNow = rangeOf(state.total);
+    state.rank = Math.max(state.rank, 0);
+    seedShips();
+    nextBonus = loaded ? 20 + Math.random() * 20 : 10;
+    last = Date.now();
+    if (loaded && !fromHot) {
+      var dt = (Date.now() - state.seen) / 1000;
+      if (dt > 10) away(dt);
+    }
+    renderAll();
+    requestAnimationFrame(frame);
+  }
+
+  var hot = null;
+  try {
+    hot = (window.claude && window.claude.hot) || null;
+    if (hot && typeof hot.snapshot === 'function') {
+      hot.snapshot(function () { if (state) state.seen = Date.now(); return { state: state }; });
+    }
+  } catch (e) { hot = null; }
+  if (hot && typeof hot.ready === 'function') hot.ready(start);
+  else start(hot && hot.data);
+})();
+</script>
+</body>
+</html>
