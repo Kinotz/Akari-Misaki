@@ -28,7 +28,14 @@
    goal, supplies and records, and a fixed dock with the light counter and the lens button.
    Single dark theme by choice: the whole page is a night at the cape. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  /* B案「版画の絵本」の色。--accent（押せるもの）と --paper（手帳の紙）は時間帯で JS が書き換える */
+  --ink-b: #33261F;      /* 墨茶：文字と線（固定） */
+  --on: #FFF8EA;         /* 押せるもの・追い風の上の文字（固定） */
+  --teal: #236A6A;       /* 追い風ボタン専用 */
+  --nano: #F2C14E;       /* お知らせ（墨茶の枠線つき） */
+  --accent: #B8492B;     /* 押せるもの：夜・夜明け #8F5F12／昼 #C42A2A／夕暮れ #B8492B */
+  --paper: #F2E4C8;      /* 手帳の紙：夜 #DADDE2／夜明け #F1E1DA／昼 #F8F5EE／夕暮れ #F2E4C8 */
   --ink: #0b1a28;
   --panel: #112636;
   --panel-hi: #17324a;
@@ -580,6 +587,31 @@ h1 { margin: 0; font: 700 19px/1 var(--font-display); letter-spacing: 0.16em; }
     return { from: DAY_PHASES[i], to: DAY_PHASES[j], t: e };
   }
   function goldenActive() { var m = dayT % DAY_CYCLE_SEC; return m >= GOLDEN_FROM && m < GOLDEN_TO; }
+
+  // ---------- 時間帯で変わる手帳の色（押せるもの・紙） ----------
+  // 文字はどの時間帯も同じ（墨茶と白）。色は線形RGBで補間するので、途中の色も
+  // 両端と同じ明るさの範囲に収まり、文字とのコントラスト（4.5:1以上）が保たれる。
+  var ACCENT_COLORS = { night: '#8F5F12', dawn: '#8F5F12', day: '#C42A2A', dusk: '#B8492B' };
+  var PAPER_COLORS = { night: '#DADDE2', dawn: '#F1E1DA', day: '#F8F5EE', dusk: '#F2E4C8' };
+  function toLin(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  function fromLin(v) { v = Math.max(0, Math.min(1, v)); return Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)); }
+  function mixLinear(h1, h2, t) {
+    var a = hexRgb(h1), b = hexRgb(h2), out = [];
+    for (var i = 0; i < 3; i++) { var x = toLin(a[i]), y = toLin(b[i]); out.push(fromLin(x + (y - x) * t)); }
+    return 'rgb(' + out.join(',') + ')';
+  }
+  var lastTimeColors = '';
+  function applyTimeColors() {
+    var ph = dayBlend();
+    var acc = mixLinear(ACCENT_COLORS[ph.from], ACCENT_COLORS[ph.to], ph.t);
+    var pap = mixLinear(PAPER_COLORS[ph.from], PAPER_COLORS[ph.to], ph.t);
+    var sig = acc + pap;
+    if (sig === lastTimeColors) return;
+    lastTimeColors = sig;
+    var st = document.documentElement.style;
+    st.setProperty('--accent', acc);
+    st.setProperty('--paper', pap);
+  }
   var toastTimer = 0, upSig = null;
 
   // ---------- 数の表示(万・億・兆) ----------
@@ -1154,6 +1186,7 @@ h1 { margin: 0; font: 700 19px/1 var(--font-display); letter-spacing: 0.16em; }
 
   var uiLast = '';
   function renderAll() {
+    applyTimeColors();
     var c = cps();
     rangeNow = rangeOf(state.total);
     var ri = rankIdx(rangeNow);
