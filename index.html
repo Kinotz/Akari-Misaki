@@ -62,15 +62,6 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .scene { position: fixed; inset: 0; z-index: 0; background: #1D2944; }
 #sea { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: pointer; }
 
-.bgm {
-  position: fixed; z-index: 2;
-  left: max(12px, env(safe-area-inset-left, 0px)); top: max(12px, env(safe-area-inset-top, 0px));
-  width: 44px; height: 44px; border: 2.5px solid var(--ink-b); border-radius: 0;
-  background: var(--paper); color: var(--ink-b);
-  font-size: 18px; line-height: 1; display: grid; place-items: center; cursor: pointer;
-}
-.bgm[aria-pressed="true"] { background: var(--ink-b); color: var(--paper); }
-
 /* ---------- 下半分：灯台守の手帳（紙） ---------- */
 .sheet {
   position: fixed; z-index: 1;
@@ -84,18 +75,48 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   padding-top: 6px;
 }
 
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .sheet-head {
-  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px));
+  flex: none; display: flex; align-items: center; gap: 2px;
+  padding: 4px max(4px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
 }
-h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
 .rank {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
-  cursor: pointer; background: none; border: 0; padding: 0; text-align: right; color: var(--ink-b);
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  cursor: pointer; background: none; border: 0; padding: 4px 0; text-align: left; color: var(--ink-b);
 }
-.rank-name { font: 700 15px/1.3 var(--font-display); }
-.range { font-size: 13px; line-height: 1.3; font-variant-numeric: tabular-nums; }
-.range b { font-weight: 700; }
+.rank b { font: 700 17px/1.3 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* 次の格までの進み：点が一つずつ塗られていき、最後に小さな灯台 */
+.steps { display: flex; align-items: center; gap: 5px; }
+.steps i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink-b); flex: none; }
+.steps i.on { background: var(--accent); border-color: var(--accent); }
+.steps svg { flex: none; margin-left: 1px; }
+.icon {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink-b);
+}
+#bgmBtn .mute { display: none; }
+#bgmBtn[aria-pressed="false"] .wave { display: none; }
+#bgmBtn[aria-pressed="false"] .mute { display: inline; }
+
+/* 集めた光と、磨くボタン（手帳の上の段） */
+.act {
+  flex: none; position: relative; display: flex; align-items: center; gap: 12px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 2px max(16px, env(safe-area-inset-left, 0px));
+}
+.bank { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.bank strong { font: 700 38px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bank .cps { margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.bank .cps em { font-style: normal; font-weight: 700; margin-left: 6px; }
+
+/* 次の目標（1行） */
+.goal {
+  flex: none; display: flex; align-items: baseline; gap: 8px; font-size: 15px;
+  padding: 2px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));
+  border-bottom: 2.5px solid var(--ink-b);
+}
+.goal b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.goal .goal-left { margin-left: auto; flex: none; }
+.goal[data-ready="true"] .goal-left { font-weight: 700; }
 
 .sheet-body {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
@@ -118,15 +139,6 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
 
 .hint { margin: 0; font-size: 15px; line-height: 1.6; }
 
-/* 次の目標 */
-.goal { display: flex; flex-direction: column; gap: 6px; }
-.goal-line { display: flex; align-items: baseline; gap: 8px; }
-.goal-label { flex: none; font-size: 15px; }
-.goal-line b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 16px/1.3 var(--font-display); }
-.goal-left { margin-left: auto; flex: none; font-size: 15px; font-variant-numeric: tabular-nums; }
-.goal[data-ready="true"] .goal-left { font-weight: 700; }
-.goal-bar { height: 6px; border: 2px solid var(--ink-b); background: transparent; overflow: hidden; }
-.goal-bar i { display: block; height: 100%; width: 0; background: var(--ink-b); }
 .dot { display: inline-block; width: 9px; height: 9px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
 /* 追い風(広告ブースト) */
@@ -234,17 +246,6 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
   font-size: 15px; font-weight: 700; line-height: 1.5; text-align: center; pointer-events: none;
 }
 
-/* 集めた光と、磨くボタン */
-.dock {
-  flex: none; position: relative;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
-  border-top: 2.5px solid var(--ink-b);
-}
-.bank { display: flex; flex-direction: column; min-width: 0; }
-.bank .label { margin-bottom: 0; }
-.bank strong { font: 700 34px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.bank .cps { margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
 .polish {
   position: relative; flex: none; width: 96px; height: 96px; border: 0; padding: 0; cursor: pointer;
   display: grid; place-items: center; align-content: center; background: none; color: var(--on);
@@ -297,9 +298,8 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
 
 /* 背の低い画面では、手帳の上下を詰めて中身を多く見せる */
 @media (max-height: 740px) {
-  .sheet-head { padding-top: 6px; padding-bottom: 4px; }
-  .dock { padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
-  .bank strong { font-size: 30px; }
+  .bank strong { font-size: 32px; }
+  .polish { width: 84px; height: 84px; }
 }
 /* 横向きなど高さが足りないときは、手帳を少し高めから始める */
 @media (max-height: 560px) {
@@ -316,32 +316,38 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
 <section class="scene" aria-label="夕暮れの岬">
   <canvas id="sea" aria-label="灯台のある夕暮れの海。灯りや塔をタップすると光が集まり、金色に光る船をタップすると導けます"></canvas>
 </section>
-<button class="bgm" id="bgmBtn" type="button" aria-pressed="false" aria-label="ローファイのBGMを再生する">
-  <span aria-hidden="true">♪</span>
-</button>
-
 <main class="sheet" id="sheet" aria-label="灯台守の手帳">
+  <h1 class="vh">灯りの岬</h1>
   <header class="sheet-head">
-    <h1>灯りの岬</h1>
     <button class="rank" id="rankBtn" type="button" aria-label="いまの灯台の格について">
-      <span class="rank-name" id="rankName">港の常夜灯</span>
-      <span class="range">光達距離 <b id="rangeVal">3.0</b> 海里</span>
+      <b id="rankName">港の常夜灯</b>
+      <span class="steps" id="rankSteps" role="img" aria-label="次の格まで"></span>
+    </button>
+    <button class="icon" id="bgmBtn" type="button" aria-pressed="false" aria-label="音を鳴らす">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4z"/><path class="wave" d="M15.5 9.2c1.1 1.6 1.1 4 0 5.6M18.2 6.8c2.4 3 2.4 7.4 0 10.4"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
     </button>
   </header>
+
+  <div class="act">
+    <div class="bank">
+      <span class="vh">集めた光</span>
+      <strong id="light" class="num">0</strong>
+      <span class="cps num" id="cps">毎秒 0</span>
+    </div>
+    <button class="polish" id="polish" type="button" aria-label="灯りを磨く">
+      <i class="ghost" aria-hidden="true"></i><i class="plate" aria-hidden="true"></i><i class="ink" aria-hidden="true"></i>
+      <span>磨く</span><small id="tapGain" class="num">+1</small>
+    </button>
+  </div>
+
+  <section class="goal" id="goal" aria-label="次の目標">
+    <span>次は</span><b id="goalName">石油ランプ</b><span class="goal-left num" id="goalLeft">あと 15 光</span>
+  </section>
 
   <div class="sheet-body" id="sheetBody">
     <button class="guide" id="guide" type="button" hidden>信号船を導く</button>
 
     <p class="hint" id="hint">灯りか塔をタップして光を集めよう。金色に光る船が通ったら、タップして岬へ導こう。</p>
-
-    <section class="goal" id="goal" aria-label="次の目標">
-      <div class="goal-line">
-        <span class="goal-label">次の目標</span>
-        <b id="goalName">石油ランプ</b>
-        <span class="goal-left" id="goalLeft">あと 15 光</span>
-      </div>
-      <div class="goal-bar"><i id="goalFill"></i></div>
-    </section>
 
     <section class="boost" id="boost" aria-label="追い風" hidden>
       <div class="boost-text">
@@ -410,17 +416,6 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <div class="dock">
-    <div class="bank">
-      <span class="label">集めた光</span>
-      <strong id="light">0</strong>
-      <span class="cps" id="cps">毎秒 0</span>
-    </div>
-    <button class="polish" id="polish" type="button" aria-label="灯りを磨く">
-      <i class="ghost" aria-hidden="true"></i><i class="plate" aria-hidden="true"></i><i class="ink" aria-hidden="true"></i>
-      <span>磨く</span><small id="tapGain">+1</small>
-    </button>
-  </div>
 </main>
 
 <div class="adlayer" id="adLayer" role="dialog" aria-modal="true" aria-labelledby="adTitle" hidden>
@@ -1103,20 +1098,18 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
       GENS.forEach(function (g) { cands.push({ name: g.name, cost: Math.ceil(g.base * Math.pow(1.15, state.owned[g.id])) }); });
     }
     var ready = cands.filter(function (c) { return c.cost <= state.light; });
-    var pick, left, pct;
+    var pick, left;
     if (ready.length) {
       ready.sort(function (a, b) { return b.cost - a.cost; });
-      pick = ready[0]; left = 'いま買えます'; pct = 100;
+      pick = ready[0]; left = 'いま買えます';
     } else {
       cands.sort(function (a, b) { return a.cost - b.cost; });
       pick = cands[0];
       left = 'あと ' + fmtNum(Math.ceil(pick.cost - state.light)) + ' 光';
-      pct = Math.min(100, state.light / pick.cost * 100);
     }
     $('goal').dataset.ready = ready.length ? 'true' : 'false';
     $('goalName').textContent = pick.name;
     $('goalLeft').textContent = left;
-    $('goalFill').style.width = pct + '%';
   }
 
   // 図鑑の絵(線と面だけの小さなシルエット)
@@ -1146,6 +1139,35 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
     });
   }
 
+  var htmlCache = {};
+  function setHTML(id, html) {
+    if (htmlCache[id] === html) return;
+    htmlCache[id] = html;
+    $(id).innerHTML = html;
+  }
+  // 次の格までの進み：いまの格の基準から次の格の基準まで（光達距離）を7つの点で
+  var STEP_N = 7;
+  var STEP_LH = '<svg width="16" height="20" viewBox="0 0 18 22" aria-hidden="true"><path d="M6 6h6l2 15H4z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 12h8" stroke="currentColor" stroke-width="3"/><path d="M5 6l4-4 4 4z" fill="currentColor"/></svg>';
+  function renderRank(ri) {
+    var on, label;
+    if (ri >= RANKS.length - 1) {
+      on = STEP_N; label = 'いちばん上の格です';
+    } else {
+      var from = Math.max(3, RANKS[ri][0]), to = RANKS[ri + 1][0];
+      var frac = Math.max(0, Math.min(1, (rangeNow - from) / (to - from)));
+      on = Math.min(STEP_N - 1, Math.floor(frac * STEP_N));
+      label = '次の格「' + RANKS[ri + 1][1] + '」まで ' + on + '/' + STEP_N;
+    }
+    var key = ri + ':' + on;
+    if (htmlCache.rank === key) return;
+    htmlCache.rank = key;
+    $('rankName').textContent = RANKS[ri][1];
+    var h = '';
+    for (var i = 0; i < STEP_N; i++) h += '<i class="' + (i < on ? 'on' : '') + '"></i>';
+    $('rankSteps').innerHTML = h + STEP_LH;
+    $('rankSteps').setAttribute('aria-label', label);
+  }
+
   var uiLast = '';
   function renderAll() {
     applyTimeColors();
@@ -1160,12 +1182,13 @@ h1 { margin: 0; font: 700 17px/1.3 var(--font-display); }
       toast('灯台の格が上がりました。' + RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
     }
     $('light').textContent = fmtNum(Math.floor(state.light));
-    var bm = boostMult();
-    var bmLabel = bm % 1 === 0 ? String(bm) : bm.toFixed(1);
-    $('cps').textContent = '毎秒 ' + fmtNum(c) + (bm > 1 ? '  ' + (goldenActive() ? '✨' : '') + 'ブースト ×' + bmLabel : '');
+    // 毎秒の横に、追い風（×2）と凪の恵み（凪×1.5）を言葉で添える
+    var tags = '';
+    if (Date.now() < state.boostUntil) tags += '<em>追い風×2</em>';
+    if (goldenActive()) tags += '<em>凪×1.5</em>';
+    setHTML('cps', '毎秒 ' + fmtNum(c) + tags);
     $('tapGain').textContent = '+' + fmtNum(tapPower());
-    $('rankName').textContent = RANKS[ri][1];
-    $('rangeVal').textContent = rangeNow.toFixed(1);
+    renderRank(ri);
     $('stGuided').textContent = state.guided + '隻';
     $('stTaps').textContent = state.taps.toLocaleString('ja-JP') + '回';
     $('stTotal').textContent = fmtNum(Math.floor(state.total));
