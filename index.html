@@ -659,9 +659,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   function equipSpot(id) {
     var off = towerOff();
     switch (id) {
-      case 'lamp': return { x: W * 0.25, y: islandTopY(0.25) - 8 };
+      case 'lamp': return { x: W * LAMP_FX[0], y: islandTopY(LAMP_FX[0]) - 11 };
       case 'keeper': return { x: W * 0.355, y: islandTopY(0.355) - VH * 0.04 };
-      case 'horn': return { x: lampX + W * 0.05, y: VH * 0.32 + off };
+      case 'horn': if (gs('horn') >= 4) { var hh = hornHouseSpot(); return { x: hh.x, y: hh.y - VH * 0.03 }; } return { x: lampX + W * 0.05, y: VH * 0.32 + off };
       case 'clock': return { x: lampX + W * 0.05, y: VH * 0.385 + off };
       case 'plant': return { x: W * 0.88, y: VH * 0.92 };
       case 'wind': return { x: W * 0.86, y: horizon - VH * 0.06 };
@@ -672,9 +672,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   // 増えた1つの場所（灯・風車・桟橋の灯は何本目か。ほかは設備の場所）
   function spotOf(id, idx) {
     if (idx != null) {
-      if (id === 'lamp') { var fx = PATH_LAMP_X[idx]; return { x: W * fx, y: islandTopY(fx) - 11 }; }
+      if (id === 'lamp') { var lp = lampSpot(idx); return { x: lp.x, y: lp.y - 13 }; }
       if (id === 'wind') return { x: W * TURBINE_X[idx], y: horizon + 1 - VH * 0.075 };
-      if (id === 'plant') { var c = shownCount('plant'), f = (idx + 0.5) / c; return { x: W * 0.76 + (W * 0.28 - W * 0.04) * f, y: VH * 0.93 - 13 - f * 2 }; }
+      if (id === 'plant') { var pl = pierLight(idx, shownCount('plant')); return { x: pl.x, y: pl.y - 9 }; }
+      if (id === 'keeper') { var hp = houseSpot(idx); return { x: hp.x, y: hp.y - VH * 0.035 }; }
     }
     return equipSpot(id);
   }
@@ -695,13 +696,30 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     return k < 0.45 ? 0.6 + 0.55 * (k / 0.45) : 1.15 - 0.15 * ((k - 0.45) / 0.55);
   }
   function popAround(id, idx, x, y) { var s = popK(id, idx); if (s !== 1) { ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-x, -y); } }
-  // 景色に出ている数（数で増える設備だけ）
+  // 節目：持ち数 1・10・25・50・100 で景色が一段変わる（段は持ち数から計算し、セーブには足さない）
+  var MILES = [1, 10, 25, 50, 100];
+  function stg(n) { var s = 0; for (var i = 0; i < MILES.length; i++) if (n >= MILES[i]) s = i + 1; return s; }
+  function gs(id) { return state ? stg(state.owned[id] || 0) : 0; }
+  // 節目をまたいで買ったときに、手帳に出す1行（20字以内）。[段2, 段3, 段4, 段5]
+  var MILE_TEXT = {
+    lamp: ['小径の灯が、灯りの並木になった', '並木の灯が、背をのばした', '夜の岬から、天灯が昇りはじめた', '天灯がふえ、岬の夜がにぎやかに'],
+    mirror: ['光線の幅が広がった', '光線の先に、光がたまる', '光線に、もう一色が重なった', '夜空に、光の柱が立った'],
+    keeper: ['小屋の煙突から煙がのぼる', '岬に二軒目の家が建った', '家が三軒になった', '岬が、灯台守の村になった'],
+    clock: ['回廊の歯車が大きくなった', '歯車が二つになった', '歯車が三つ。レンズが軽く回る', 'レンズが二面になり、光線が二本に'],
+    fresnel: ['レンズの光が、ひとまわり広がった', '灯室がひとまわり大きくなった', '灯室に、二重の回廊', '灯室に、金の冠'],
+    horn: ['霧笛がひとまわり大きく', '回廊に、二本目の霧笛', '岬の浜に、霧信号所が建った', '霧信号所が、沖へ音を送る'],
+    plant: ['防波堤の先に、紅い灯がともった', '港にクレーンが立った', '港に発電所の建屋ができた', '港に、二本目の防波堤'],
+    wind: ['沖に、風車が見えはじめた', '沖の風車が列になった', '沖に、風車の林', '水平線いっぱいの風車'],
+    satellite: ['岬にパラボラが立った', '空の衛星が二つに', 'パラボラが二基になった', '衛星が三つ、夜空に軌道が見える']
+  };
+  // 景色に出ている数（数で増える物だけ）：灯は9個まで1本ずつ（10個から並木）、風車は手前に5基まで、桟橋の灯は5つまで、家は段で1〜4軒
   function shownCount(id) {
     var n = state ? state.owned[id] : 0;
     if (n < 1) return 0;
-    if (id === 'lamp') return Math.min(6, 1 + Math.floor(Math.log(n) / Math.log(2)));
-    if (id === 'wind') return Math.min(5, 1 + Math.floor(Math.log(n) / Math.log(2)));
-    if (id === 'plant') return Math.min(6, 2 + Math.floor(Math.log(1 + n) / Math.log(2)));
+    if (id === 'lamp') return n >= 10 ? LAMP_FX.length : Math.min(LAMP_FX.length, n);
+    if (id === 'wind') return Math.min(5, n);
+    if (id === 'plant') return Math.min(5, 1 + n);
+    if (id === 'keeper') return [0, 1, 1, 2, 3, 4][stg(n)];
     return 1;
   }
   var fog = 0, fogTarget = 0, fogTimer = 70 + Math.random() * 60, fogLeft = 0;
@@ -1132,12 +1150,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var g = GMAP[id], p = plan(g);
     if (state.light < p.cost) return;
     if (state.owned[id] === 0 && p.n > 0) track('gen_buy_first', { gen: id });
-    var shown0 = shownCount(id);
+    var shown0 = shownCount(id), stage0 = stg(state.owned[id]);
     state.light -= p.cost;
     state.owned[id] += p.n;
+    var stage1 = stg(state.owned[id]);
+    if (stage1 > stage0 && stage1 >= 2) toast(MILE_TEXT[id][stage1 - 2], 3200, 2, 'mile');
     pulse = Math.max(pulse, 0.6);
     // 増えた1つがあればそれを、なければその設備の飾りを跳ねさせ、そこに刷った輪
-    var newIdx = shownCount(id) > shown0 && (id === 'lamp' || id === 'wind' || id === 'plant') ? shownCount(id) - 1 : null;
+    var newIdx = shownCount(id) > shown0 && (id === 'lamp' || id === 'wind' || id === 'plant' || id === 'keeper') ? shownCount(id) - 1 : null;
     popStart(id, newIdx);
     sfx('buy', { tier: GENS.indexOf(g) }); flashRow(genEls[id] && genEls[id].row); ringAt(id, newIdx);
     renderAll(); save();
@@ -2234,95 +2254,176 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     ctx.stroke();
   }
 
-  // ---------- 設備が景色に現れる ----------
+  // ---------- 設備が景色に現れる（節目 1・10・25・50・100 で姿を変える） ----------
   function nightness() { var ph = dayBlend(); return lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t); }
-  function drawHut(t) {
-    // 見習い灯台守: 岩場に灯台守の小屋。窓に灯りがともる
-    if (!state || state.owned.keeper < 1) return;
-    var ph = dayBlend();
-    var fx = 0.355, x = W * fx, y = islandTopY(fx) + 3;
-    var hw = W * 0.075, hh = VH * 0.05;
-    ctx.save(); popAround('keeper', null, x, y);
-    ctx.fillStyle = pc('tower', ph);
-    ctx.fillRect(x - hw / 2, y - hh, hw, hh);
-    ctx.fillStyle = pc('band', ph);
-    ctx.beginPath(); ctx.moveTo(x - hw / 2 - 3, y - hh); ctx.lineTo(x, y - hh - VH * 0.035); ctx.lineTo(x + hw / 2 + 3, y - hh); ctx.closePath(); ctx.fill();
-    var n = nightness();
-    var ww = hw * 0.26, wh = hh * 0.42;
-    ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#33261F';
-    ctx.fillRect(x - hw * 0.28, y - hh * 0.7, ww, wh);
-    if (n > 0.3) {
-      ctx.globalAlpha = 0.22 * n * (reduce ? 1 : 0.9 + 0.1 * Math.sin(t * 3));
-      ctx.beginPath(); ctx.arc(x - hw * 0.28 + ww / 2, y - hh * 0.7 + wh / 2, hw * 0.4, 0, 6.283); ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    ctx.restore();
-  }
 
-  var PATH_LAMP_X = [0.25, 0.68, 0.3, 0.73, 0.21, 0.63];
-  function drawPathLamps(t) {
-    // 石油ランプ：岬の小径に小さな灯が並ぶ（持っている数で増える）
-    if (!state || state.owned.lamp < 1) return;
-    var count = Math.min(6, 1 + Math.floor(Math.log(state.owned.lamp) / Math.log(2)));
-    var n = nightness();
-    for (var i = 0; i < count; i++) {
-      var fx = PATH_LAMP_X[i], x = W * fx, y = islandTopY(fx) + 2;
-      ctx.save(); popAround('lamp', i, x, y);
-      if (n > 0.3) {
-        ctx.globalAlpha = 0.22 * n * (reduce ? 1 : 0.85 + 0.15 * Math.sin(t * 2.6 + i * 1.7));
-        ctx.fillStyle = '#F2C14E';
-        ctx.beginPath(); ctx.arc(x, y - 13, 8, 0, 6.283); ctx.fill();
+  // 見習い灯台守：小屋 → 煙突の煙 → 2軒 → 3軒 → 灯台守の村（旗）
+  var HOUSE_FX = [0.355, 0.64, 0.265, 0.725];
+  function houseSpot(i) { var fx = HOUSE_FX[i]; return { x: W * fx, y: islandTopY(fx) + 3 }; }
+  function drawHut(t) {
+    if (!state || state.owned.keeper < 1) return;
+    var ph = dayBlend(), n = nightness(), cnt = shownCount('keeper'), s = gs('keeper');
+    for (var i = 0; i < cnt; i++) {
+      var p = houseSpot(i), x = p.x, y = p.y, hw = W * (i ? 0.062 : 0.075), hh = VH * (i ? 0.043 : 0.05);
+      ctx.save(); popAround('keeper', i, x, y);
+      ctx.fillStyle = pc('isleGhost', ph); ctx.fillRect(x - hw / 2 + 2, y - hh + 1.5, hw, hh);   // 版ずれ
+      ctx.fillStyle = pc('tower', ph); ctx.fillRect(x - hw / 2, y - hh, hw, hh);
+      ctx.fillStyle = pc('band', ph);
+      ctx.beginPath(); ctx.moveTo(x - hw / 2 - 3, y - hh); ctx.lineTo(x, y - hh - VH * 0.035); ctx.lineTo(x + hw / 2 + 3, y - hh); ctx.closePath(); ctx.fill();
+      var ww = hw * 0.26, wh = hh * 0.42, wx = x - hw * 0.28, wy = y - hh * 0.7;
+      ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#33261F'; ctx.fillRect(wx, wy, ww, wh);
+      if (n > 0.3) { ctx.globalAlpha = 0.22 * n; ctx.beginPath(); ctx.arc(wx + ww / 2, wy + wh / 2, hw * 0.4, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; }
+      if (i === 0 && s >= 2) {
+        // 煙突と、ゆっくり昇る煙（刷った小さな丸）
+        ctx.fillStyle = '#33261F'; ctx.fillRect(x + hw * 0.22, y - hh - VH * 0.03, 3, VH * 0.022);
+        for (var k = 0; k < 3; k++) {
+          var a = reduce ? 0.35 + k * 0.2 : ((t * 0.25 + k / 3) % 1);
+          ctx.globalAlpha = (1 - a) * 0.55; ctx.fillStyle = n > 0.5 ? '#7F8BA3' : '#FBF6EA';
+          ctx.beginPath(); ctx.arc(x + hw * 0.22 + 1.5 + a * 8, y - hh - VH * 0.035 - a * 16, 2 + a * 3, 0, 6.283); ctx.fill();
+        }
         ctx.globalAlpha = 1;
       }
-      ctx.fillStyle = '#33261F'; ctx.fillRect(x - 0.8, y - 10, 1.6, 10);
-      ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#E8D7A8';
-      ctx.fillRect(x - 2.5, y - 16, 5, 6);
-      ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 16, 5, 6);
       ctx.restore();
     }
+    if (s >= 5) {
+      // 灯台守の村：小屋の上に小さな旗
+      var p0 = houseSpot(0), fy = p0.y - VH * 0.085, wv = reduce ? 0 : Math.sin(t * 3) * 1.5;
+      ctx.fillStyle = '#33261F'; ctx.fillRect(p0.x - 0.7, fy - 12, 1.4, 12);
+      ctx.fillStyle = pc('band', ph); ctx.beginPath(); ctx.moveTo(p0.x + 0.7, fy - 12); ctx.lineTo(p0.x + 9, fy - 9 + wv); ctx.lineTo(p0.x + 0.7, fy - 6); ctx.closePath(); ctx.fill();
+    }
   }
-  function drawPier(t) {
-    // 潮力発電所: 右の岩場から防波堤がのび、灯りが並ぶ
-    if (!state || state.owned.plant < 1) return;
-    var ph = dayBlend();
-    var y0 = VH * 0.93, x0 = W * 0.76, x1 = W * 1.04;
-    ctx.save(); popAround('plant', null, x0, y0);
-    ctx.fillStyle = pc('isle', ph);
-    ctx.beginPath();
-    ctx.moveTo(x0, y0 - 3); ctx.lineTo(x1, y0 - 5); ctx.lineTo(x1, y0 + 4); ctx.lineTo(x0, y0 + 6); ctx.closePath(); ctx.fill();
-    var n = Math.max(0.35, nightness());
-    var count = Math.min(6, 2 + Math.floor(Math.log(1 + state.owned.plant) / Math.log(2)));
-    for (var i = 0; i < count; i++) {
-      var fx = (i + 0.5) / count, lx = x0 + (x1 - x0 - W * 0.04) * fx, ly = y0 - 4 - fx * 2;
-      ctx.fillStyle = pc('isle', ph); ctx.fillRect(lx - 0.7, ly - 8, 1.4, 8);
-      ctx.globalAlpha = n * (0.75 + (reduce ? 0 : 0.25 * Math.sin(t * 2 + i)));
-      ctx.fillStyle = '#F3E6C4';
-      ctx.save(); popAround('plant', i, lx, ly);
-      ctx.beginPath(); ctx.arc(lx, ly - 9, 2.2, 0, 6.283); ctx.fill();
+
+  // 石油ランプ：小径の灯（8本まで）→ 灯りの並木（綱と小さな灯）→ 背の高い灯 → 夜に天灯が昇る → 天灯がふえる
+  var LAMP_FX = [0.405, 0.595, 0.31, 0.69, 0.215, 0.81, 0.435, 0.565];
+  function lampSpot(i) { var fx = LAMP_FX[i]; return { x: W * fx, y: islandTopY(fx) + 2 }; }
+  function drawPathLamps(t) {
+    if (!state || state.owned.lamp < 1) return;
+    var s = gs('lamp'), n = nightness(), cnt = shownCount('lamp'), tall = s >= 3 ? 4 : 0;
+    var head = n > 0.3 ? '#F2C14E' : '#E8D7A8';
+    if (s >= 2) {
+      // 並木：同じ側の灯どうしを、たわんだ綱でつなぎ、小さな灯をつるす
+      [[0.215, 0.31, 0.405, 0.435], [0.565, 0.595, 0.69, 0.81]].forEach(function (side) {
+        for (var j = 0; j < side.length - 1; j++) {
+          var ax = W * side[j], ay = islandTopY(side[j]) - 14 - tall, bx = W * side[j + 1], by = islandTopY(side[j + 1]) - 14 - tall;
+          if (Math.abs(ax - bx) < 14) continue;
+          var mx = (ax + bx) / 2, my = Math.max(ay, by) + 5;
+          ctx.strokeStyle = n > 0.3 ? 'rgba(242,193,78,0.55)' : 'rgba(51,38,31,0.6)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx, my, bx, by); ctx.stroke();
+          ctx.fillStyle = head;
+          for (var q = 1; q <= 3; q++) {
+            var u = q / 4, qx = (1 - u) * (1 - u) * ax + 2 * u * (1 - u) * mx + u * u * bx, qy = (1 - u) * (1 - u) * ay + 2 * u * (1 - u) * my + u * u * by;
+            ctx.beginPath(); ctx.arc(qx, qy + 1.5, 1.4, 0, 6.283); ctx.fill();
+          }
+        }
+      });
+    }
+    for (var i = 0; i < cnt; i++) {
+      var p = lampSpot(i), x = p.x, y = p.y;
+      ctx.save(); popAround('lamp', i, x, y);
+      if (n > 0.3) {
+        ctx.globalAlpha = (s >= 3 ? 0.3 : 0.22) * n * (reduce ? 1 : 0.85 + 0.15 * Math.sin(t * 2.6 + i * 1.7));
+        ctx.fillStyle = '#F2C14E';
+        ctx.beginPath(); ctx.arc(x, y - 13 - tall, s >= 3 ? 11 : 8, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = '#33261F'; ctx.fillRect(x - 0.8, y - 10 - tall, 1.6, 10 + tall);
+      ctx.fillStyle = head; ctx.fillRect(x - 2.5, y - 16 - tall, 5, 6);
+      ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 16 - tall, 5, 6);
       ctx.restore();
+    }
+    if (s >= 4 && n > 0.3) {
+      // 天灯：夜、岬から灯がゆっくり昇っていく（50個で3つ、100個で6つ）
+      var k2 = s >= 5 ? 6 : 3;
+      ctx.fillStyle = '#F2C14E';
+      for (var j2 = 0; j2 < k2; j2++) {
+        var per = 22 + j2 * 3, ph2 = ((reduce ? 0.3 + j2 * 0.11 : t / per) + j2 * 0.37) % 1;
+        var lx = W * (0.25 + ((j2 * 0.29) % 0.5)) + (reduce ? 0 : Math.sin(ph2 * 6 + j2) * 6), ly = VH * 0.82 - ph2 * (VH * 0.82 - horizon * 0.25);
+        ctx.globalAlpha = n * Math.min(1, ph2 * 6) * (1 - ph2) * 0.95;
+        ctx.fillRect(lx - 2, ly - 3, 4, 5);
+        ctx.globalAlpha *= 0.3; ctx.beginPath(); ctx.arc(lx, ly - 0.5, 6, 0, 6.283); ctx.fill();
+      }
       ctx.globalAlpha = 1;
+    }
+  }
+
+  // 潮力発電所：桟橋 → 紅い灯の防波堤 → クレーン → 発電所の建屋 → 二本目の防波堤
+  function pierLight(i, cnt) { var f = (i + 0.5) / cnt; return { x: W * 0.76 + (W * 0.28 - W * 0.04) * f, y: VH * 0.93 - 4 - f * 2 }; }
+  function drawPier(t) {
+    if (!state || state.owned.plant < 1) return;
+    var ph = dayBlend(), s = gs('plant'), n = Math.max(0.35, nightness()), night = nightness();
+    var y0 = VH * 0.93, x0 = W * 0.76, x1 = W * 1.04, ink = pc('isle', ph);
+    ctx.save(); popAround('plant', null, x0, y0);
+    if (s >= 5) {
+      // 二本目の防波堤（奥）
+      var y2 = VH * 0.885, x2 = W * 0.86;
+      ctx.fillStyle = pc('isleGhost', ph); ctx.fillRect(x2 + 2, y2 - 1, x1 - x2, 4);
+      ctx.fillStyle = ink; ctx.fillRect(x2, y2 - 2.5, x1 - x2, 4);
+      ctx.fillStyle = '#FBF6EA'; ctx.fillRect(x2 - 3, y2 - 11, 5, 9);
+      ctx.fillStyle = '#2F8080'; ctx.fillRect(x2 - 3, y2 - 8, 5, 2.5);
+      ctx.globalAlpha = reduce ? 0.8 : (Math.sin(t * 1.6 + 1.5) > 0 ? 1 : 0.35); ctx.fillStyle = '#8FE0A8';
+      ctx.beginPath(); ctx.arc(x2 - 0.5, y2 - 13, 1.8, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = pc('isleGhost', ph); ctx.beginPath(); ctx.moveTo(x0 + 2, y0 - 1); ctx.lineTo(x1, y0 - 3); ctx.lineTo(x1, y0 + 6); ctx.lineTo(x0 + 2, y0 + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = ink; ctx.beginPath(); ctx.moveTo(x0, y0 - 3); ctx.lineTo(x1, y0 - 5); ctx.lineTo(x1, y0 + 4); ctx.lineTo(x0, y0 + 6); ctx.closePath(); ctx.fill();
+    var cnt = shownCount('plant');
+    for (var i = 0; i < cnt; i++) {
+      var lp = pierLight(i, cnt);
+      ctx.fillStyle = ink; ctx.fillRect(lp.x - 0.7, lp.y - 8, 1.4, 8);
+      ctx.save(); popAround('plant', i, lp.x, lp.y);
+      ctx.globalAlpha = n * (0.75 + (reduce ? 0 : 0.25 * Math.sin(t * 2 + i))); ctx.fillStyle = '#F3E6C4';
+      ctx.beginPath(); ctx.arc(lp.x, lp.y - 9, 2.2, 0, 6.283); ctx.fill();
+      ctx.restore(); ctx.globalAlpha = 1;
+    }
+    if (s >= 2) {
+      // 防波堤の先の紅い灯台
+      ctx.fillStyle = '#FBF6EA'; ctx.fillRect(x0 - 3, y0 - 14, 6, 11);
+      ctx.fillStyle = '#E2643F'; ctx.fillRect(x0 - 3, y0 - 10, 6, 3);
+      ctx.globalAlpha = reduce ? 0.8 : (Math.sin(t * 1.6) > 0 ? 1 : 0.35); ctx.fillStyle = '#E2643F';
+      ctx.beginPath(); ctx.arc(x0, y0 - 16, 2, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+    }
+    if (s >= 3) {
+      // クレーン
+      var cx = x0 + W * 0.12; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx, y0 - 4); ctx.lineTo(cx, y0 - 30); ctx.lineTo(cx - 18, y0 - 24); ctx.moveTo(cx - 16, y0 - 24); ctx.lineTo(cx - 16, y0 - 13); ctx.stroke();
+    }
+    if (s >= 4) {
+      // 発電所の建屋（窓に灯）
+      var bx = W * 0.9, by = y0 - 4, bw = W * 0.09, bh = VH * 0.06;
+      ctx.fillStyle = pc('isleGhost', ph); ctx.fillRect(bx + 2, by - bh + 1.5, bw, bh);
+      ctx.fillStyle = pc('tower', ph); ctx.fillRect(bx, by - bh, bw, bh);
+      ctx.fillStyle = pc('band', ph); ctx.fillRect(bx - 1, by - bh - 3, bw + 2, 3);
+      ctx.fillStyle = night > 0.3 ? '#F2C14E' : '#33261F';
+      for (var w2 = 0; w2 < 3; w2++) ctx.fillRect(bx + 4 + w2 * bw * 0.3, by - bh * 0.65, bw * 0.16, bh * 0.3);
     }
     ctx.restore();
   }
 
+  // 洋上風力発電：手前の風車は持ち数ぶん（5基まで）、10個から沖に小さな風車がふえていく
   var TURBINE_X = [0.86, 0.1, 0.94, 0.19, 0.78];
+  var FAR_FX = [0.66, 0.31, 0.72, 0.26, 0.61, 0.36, 0.69, 0.04, 0.98, 0.22, 0.64, 0.33, 0.75, 0.08];
   function drawTurbines(t) {
-    // 洋上風力発電: 水平線に風車が増えていく。羽が回り、赤い航空灯が点滅する
     if (!state || state.owned.wind < 1) return;
-    var count = Math.min(5, 1 + Math.floor(Math.log(state.owned.wind) / Math.log(2)));
-    var h = VH * 0.075, blade = VH * 0.032, n = nightness();
+    var s = gs('wind'), near = shownCount('wind'), far = [0, 0, 3, 6, 10, 14][s], n = nightness();
     var col = n > 0.5 ? '#F3E6C4' : '#FBF6EA';
-    for (var i = 0; i < count; i++) {
+    if (far) {
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.75; ctx.lineWidth = 1; ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (var j = 0; j < far; j++) {
+        var fxx = W * FAR_FX[j], hb = horizon - VH * 0.03, a0 = (reduce ? 0.4 : t * 1.1) + j;
+        ctx.moveTo(fxx, horizon + 0.5); ctx.lineTo(fxx, hb);
+        for (var k = 0; k < 3; k++) { var a = a0 + k * 2.094; ctx.moveTo(fxx, hb); ctx.lineTo(fxx + Math.cos(a) * 4.5, hb + Math.sin(a) * 4.5); }
+      }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    var h = VH * 0.075, blade = VH * 0.032;
+    for (var i = 0; i < near; i++) {
       var x = W * TURBINE_X[i], base = horizon + 1, hubY = base - h;
       ctx.save(); popAround('wind', i, x, base);
       ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, hubY); ctx.stroke();
       var ang = (reduce ? 0.6 : t * (0.9 + i * 0.07)) + i * 1.3;
       ctx.lineWidth = 1.6;
-      for (var k = 0; k < 3; k++) {
-        var a = ang + k * 2.094;
-        ctx.beginPath(); ctx.moveTo(x, hubY); ctx.lineTo(x + Math.cos(a) * blade, hubY + Math.sin(a) * blade); ctx.stroke();
-      }
+      for (var k2 = 0; k2 < 3; k2++) { var a2 = ang + k2 * 2.094; ctx.beginPath(); ctx.moveTo(x, hubY); ctx.lineTo(x + Math.cos(a2) * blade, hubY + Math.sin(a2) * blade); ctx.stroke(); }
       var blink = reduce ? 0.7 : (Math.sin(t * 2.4 + i * 0.9) > 0.6 ? 1 : 0.25);
       ctx.globalAlpha = blink; ctx.fillStyle = '#E2643F';
       ctx.beginPath(); ctx.arc(x, hubY - 1, 1.8, 0, 6.283); ctx.fill();
@@ -2331,33 +2432,103 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     }
   }
 
+  // 人工衛星管制局：空の衛星1つ → 岬にパラボラ → 衛星2つ → パラボラ2基 → 衛星3つと夜の軌道の点線
+  var satSpot = null;
+  function satPos(i, p) { return { x: -10 + (W + 20) * p, y: horizon * (0.22 + i * 0.08 - 0.1 * Math.sin(p * Math.PI)) }; }
   function drawSatellite(t) {
-    // 人工衛星管制局: 空をゆっくり渡る衛星（昼は本体とパネル、夜は灯が点滅）
     if (!state || state.owned.satellite < 1) return;
-    var n = nightness();
-    var period = 46, k = (satT % period) / period;
-    if (k > 0.8) return; // 少し間をあけて次が来る
-    var p = reduce ? 0.62 : k / 0.8, x = -10 + (W + 20) * p, y = horizon * (0.22 - 0.1 * Math.sin(p * Math.PI));
-    satSpot = { x: x, y: y };
-    ctx.save(); popAround('satellite', null, x, y);
-    drawSatBody(x, y, 1 - n * 0.6);
-    ctx.restore();
-    if (n >= 0.25) {
-      var blink = reduce ? 0.8 : (Math.sin(t * 6) > 0 ? 1 : 0.4);
-      ctx.globalCompositeOperation = 'lighter';
-      lightDot(x, y, 1, '220,240,255', 0.8 * n * blink);
-      ctx.globalCompositeOperation = 'source-over';
+    var n = nightness(), s = gs('satellite'), cnt = s >= 5 ? 3 : s >= 3 ? 2 : 1;
+    if (s >= 5 && n > 0.3) {
+      // 夜の軌道：衛星の通り道を点線で
+      ctx.fillStyle = '#F3E6C4'; ctx.globalAlpha = 0.6 * n;
+      for (var d = 0; d < 30; d++) { var q = satPos(0, d / 29); ctx.fillRect(q.x - 0.9, q.y - 0.9, 1.8, 1.8); }
+      ctx.globalAlpha = 1;
+    }
+    for (var i = 0; i < cnt; i++) {
+      var period = 46 + i * 9, k = ((satT + i * 17) % period) / period;
+      if (k > 0.8 && !reduce) continue; // 少し間をあけて次が来る
+      var p = reduce ? 0.62 - i * 0.22 : k / 0.8, sp = satPos(i, p);
+      if (i === 0) satSpot = sp;
+      ctx.save(); popAround('satellite', null, sp.x, sp.y);
+      drawSatBody(sp.x, sp.y, 1 - n * 0.25);
+      ctx.restore();
+      if (n >= 0.25) {
+        var blink = reduce ? 0.8 : (Math.sin(t * 6 + i) > 0 ? 1 : 0.4);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.8 * n * blink; ctx.fillStyle = '#DCF0FF';
+        ctx.beginPath(); ctx.arc(sp.x, sp.y, 1.4, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 0.25 * n * blink; ctx.beginPath(); ctx.arc(sp.x, sp.y, 4, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      }
     }
   }
-  var satSpot = null;
   function drawSatBody(x, y, a) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(1.35, 1.35); ctx.translate(-x, -y);
     ctx.globalAlpha = a;
     ctx.fillStyle = '#2D6A99'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 0.8;
     ctx.fillRect(x - 8.5, y - 1.5, 5, 3); ctx.strokeRect(x - 8.5, y - 1.5, 5, 3);
     ctx.fillRect(x + 3.5, y - 1.5, 5, 3); ctx.strokeRect(x + 3.5, y - 1.5, 5, 3);
     ctx.fillStyle = '#FBF1DC'; ctx.fillRect(x - 2.5, y - 2.5, 5, 5); ctx.strokeRect(x - 2.5, y - 2.5, 5, 5);
     ctx.fillStyle = '#33261F'; ctx.fillRect(x - 3.5, y - 0.4, 7, 0.8);
-    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  // パラボラ：右の岩場（25個で1基、50個で2基）
+  var DISH_FX = [0.765, 0.835];
+  function drawDishes() {
+    var s = gs('satellite');
+    if (s < 2) return;
+    for (var i = 0; i < (s >= 4 ? 2 : 1); i++) {
+      var fx = DISH_FX[i], x = W * fx, y = islandTopY(fx) + 1, r = i ? 8 : 10;
+      ctx.save(); popAround('satellite', null, x, y);
+      ctx.fillStyle = '#33261F'; ctx.fillRect(x - 1, y - 12, 2, 12);
+      ctx.fillStyle = '#FBF6EA'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(x - 2, y - 14, r, r * 0.5, -0.6, 0, Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#E2643F'; ctx.beginPath(); ctx.arc(x - 2.5, y - 18, 1.5, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // 霧笛：ラッパ → 大きなラッパ → 反対側にも → 浜に赤屋根の霧信号所 → 霧信号所から沖へ音の弧
+  function drawHornGallery(off, ink) {
+    if (!state || state.owned.horn < 1) return;
+    var s = gs('horn'), sc = s >= 2 ? 1.5 : 1, hy = VH * 0.325 + off - 9;
+    ctx.save(); popAround('horn', null, lampX + W * 0.05, hy);
+    ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = ink; ctx.lineWidth = 1.2;
+    for (var side = 1; side >= (s >= 3 ? -1 : 1); side -= 2) {
+      var hx = lampX + side * W * 0.045;
+      ctx.beginPath();
+      ctx.moveTo(hx - side * 4, hy - 1.5); ctx.lineTo(hx + side * 6 * sc, hy - 3.5 * sc); ctx.lineTo(hx + side * 9 * sc, hy - 7 * sc);
+      ctx.lineTo(hx + side * 9 * sc, hy + 5 * sc); ctx.lineTo(hx + side * 6 * sc, hy + 1.5 * sc); ctx.lineTo(hx - side * 4, hy + 1.5); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function hornHouseSpot() { var fx = 0.2; return { x: W * fx, y: islandTopY(fx) + 3 }; }
+  function drawHornHouse(t) {
+    var s = gs('horn');
+    if (s < 4) return;
+    var ph = dayBlend(), p = hornHouseSpot(), hw = W * 0.065, hh = VH * 0.065, n = nightness();
+    ctx.save(); popAround('horn', null, p.x, p.y);
+    ctx.fillStyle = pc('isleGhost', ph); ctx.fillRect(p.x - hw / 2 + 2, p.y - hh + 1.5, hw, hh);
+    ctx.fillStyle = pc('tower', ph); ctx.fillRect(p.x - hw / 2, p.y - hh, hw, hh);
+    ctx.fillStyle = pc('band', ph); ctx.fillRect(p.x - hw / 2 - 2, p.y - hh - 4, hw + 4, 4);
+    // 沖へ向けたラッパ
+    ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1;
+    var hx = p.x - hw / 2, hy = p.y - hh * 0.55;
+    ctx.beginPath(); ctx.moveTo(hx + 2, hy - 1.5); ctx.lineTo(hx - 6, hy - 3); ctx.lineTo(hx - 9, hy - 6); ctx.lineTo(hx - 9, hy + 5); ctx.lineTo(hx - 6, hy + 2); ctx.lineTo(hx + 2, hy + 1.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    if (s >= 5 && !reduce) {
+      // 6秒ごとに、版画の細い音の弧が2本、沖へ（1.2秒）
+      var k = (t % 6) / 1.2;
+      if (k < 1) {
+        ctx.lineWidth = 1.2; ctx.strokeStyle = n > 0.5 ? '#F3E6C4' : '#33261F';
+        for (var j = 0; j < 2; j++) {
+          var kk = k - j * 0.25; if (kk <= 0) continue;
+          ctx.globalAlpha = 1 - kk; ctx.beginPath(); ctx.arc(hx - 9, hy, 6 + kk * 22, Math.PI * 0.75, Math.PI * 1.25); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
   }
   function drawFog(t) {
     // 霧笛: ときどき海に霧が流れてくる（淡い紙色の帯）
@@ -2516,7 +2687,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   function drawTower() {
     var off = towerOff(), ph = dayBlend();
     var topY = VH * 0.33 + off, baseY = VH * 0.8, len = baseY - topY;
-    var lw = W * 0.027 * (towerGrow >= 4 ? 1.12 : 1), ltop = VH * 0.255 + off, lh = VH * 0.07;
+    var lw = W * 0.027 * lanternScale(), ltop = VH * 0.255 + off, lh = VH * 0.07;
     // 版のずれ：塔と灯室の影を少しずらして先に刷る
     ctx.fillStyle = pc('towerGhost', ph);
     towerBody(off, 3, 2); ctx.fill();
@@ -2546,6 +2717,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       // 反射鏡：灯室の奥に銀の反射板
       ctx.fillStyle = 'rgba(214,220,226,0.95)';
       ctx.beginPath(); ctx.arc(lampX + lw * 0.55, cy, lw * 0.75, Math.PI / 2, Math.PI * 1.5); ctx.closePath(); ctx.fill();
+      if (gs('mirror') >= 2) { ctx.beginPath(); ctx.arc(lampX - lw * 0.55, cy, lw * 0.75, -Math.PI / 2, Math.PI / 2); ctx.closePath(); ctx.fill(); }
     }
     if (state && state.owned.fresnel > 0) {
       // フレネルレンズ：同心のプリズムの線
@@ -2561,17 +2733,24 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.fillRect(lampX - gw, gy - 7, gw * 2, 1.6);
       for (var k = -3; k <= 3; k++) ctx.fillRect(lampX + k * gw / 3.2 - 0.7, gy - 7, 1.4, 7);
     }
-    if (state && state.owned.horn > 0) {
-      // 霧笛：回廊に、海へ向けたラッパ
-      var hy = VH * 0.325 + off - 9, hx = lampX + W * 0.045;
-      ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = ink; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.moveTo(hx - 4, hy - 1.5); ctx.lineTo(hx + 6, hy - 3.5); ctx.lineTo(hx + 9, hy - 7); ctx.lineTo(hx + 9, hy + 5); ctx.lineTo(hx + 6, hy + 1.5); ctx.lineTo(hx - 4, hy + 1.5); ctx.closePath();
-      ctx.fill(); ctx.stroke();
+    if (gs('fresnel') >= 4) {
+      // フレネル50個：灯室の下に、もう一段の回廊
+      var gy2 = VH * 0.325 + off + 9, gw2 = W * 0.05;
+      ctx.fillRect(lampX - gw2, gy2, gw2 * 2, 3);
+      ctx.fillRect(lampX - gw2, gy2 - 6, gw2 * 2, 1.4);
+      for (var k3 = -3; k3 <= 3; k3++) ctx.fillRect(lampX + k3 * gw2 / 3.2 - 0.6, gy2 - 6, 1.2, 6);
     }
+    drawHornGallery(off, ink);
     ctx.fillStyle = ink;
     ctx.beginPath();
     ctx.moveTo(lampX - lw - 4, ltop); ctx.quadraticCurveTo(lampX, VH * 0.2 + off, lampX + lw + 4, ltop); ctx.closePath(); ctx.fill();
     ctx.fillRect(lampX - 1, VH * 0.19 + off, 2, VH * 0.03);
+    if (gs('fresnel') >= 5) {
+      // フレネル100個：屋根に金の冠
+      ctx.fillStyle = '#F2C14E'; ctx.strokeStyle = ink; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(lampX - lw - 1, ltop - 1); ctx.lineTo(lampX - lw + 2, ltop - 6); ctx.lineTo(lampX - lw * 0.4, ltop - 3); ctx.lineTo(lampX, ltop - 8);
+      ctx.lineTo(lampX + lw * 0.4, ltop - 3); ctx.lineTo(lampX + lw - 2, ltop - 6); ctx.lineTo(lampX + lw + 1, ltop - 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
     if (state && Date.now() < state.boostUntil) {
       // 追い風：てっぺんの小旗がたなびく
       var fy = VH * 0.19 + off, wv = reduce ? 0 : Math.sin(Date.now() / 160) * 2;
@@ -2598,7 +2777,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
   function drawClockwork() {
     if (!state || state.owned.clock < 1) return;
-    var off = towerOff(), lw = W * 0.027 * (towerGrow >= 4 ? 1.12 : 1), ltop = VH * 0.255 + off, lh = VH * 0.07;
+    var off = towerOff(), lw = W * 0.027 * lanternScale(), ltop = VH * 0.255 + off, lh = VH * 0.07, s = gs('clock');
     ctx.save(); ctx.beginPath(); ctx.rect(lampX - lw, ltop, lw * 2, lh); ctx.clip();
     var sx = lampX + Math.sin(theta) * lw * 0.9;
     ctx.fillStyle = 'rgba(255,250,232,0.85)'; ctx.fillRect(sx - 2, ltop, 4, lh);
@@ -2606,36 +2785,58 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     ctx.restore();
     var sp = equipSpot('clock');
     ctx.save(); popAround('clock', null, sp.x, sp.y);
-    gear(sp.x, sp.y, 4, theta, 8);
+    var r1 = s >= 2 ? 5.5 : 4;
+    gear(sp.x, sp.y, r1, theta, 8);
+    if (s >= 3) gear(sp.x + r1 * 1.9, sp.y - r1 * 0.9, r1 * 0.66, -theta * 1.5 + 0.2, 6);
+    if (s >= 4) gear(sp.x + r1 * 0.3, sp.y + r1 * 2.1, r1 * 0.75, -theta * 1.33, 7);
     ctx.restore();
+  }
+  // 灯室の大きさ：最上位の格で1.12倍、フレネルレンズ 25・50・100個で さらに 1.2・1.36・1.5倍
+  function lanternScale() { var f = gs('fresnel'); return (towerGrow >= 4 ? 1.12 : 1) * (f >= 5 ? 1.5 : f >= 4 ? 1.36 : f >= 3 ? 1.2 : 1);
   }
 
   function drawBeam(dir, len) {
     if (len < 2) return;
-    var n = nightness();
+    var n = nightness(), ms = gs('mirror'), wd = ms >= 2 ? 0.1 : 0.07;
     ctx.fillStyle = 'rgba(255,244,214,' + (0.28 + 0.3 * n) + ')';
     var tilt = len * 0.05;
     ctx.beginPath();
     ctx.moveTo(lampX, lampY - 2);
-    ctx.lineTo(lampX + dir * len, lampY - len * 0.07 + tilt);
-    ctx.lineTo(lampX + dir * len, lampY + len * 0.07 + tilt);
+    ctx.lineTo(lampX + dir * len, lampY - len * wd + tilt);
+    ctx.lineTo(lampX + dir * len, lampY + len * wd + tilt);
     ctx.lineTo(lampX, lampY + 2);
     ctx.closePath(); ctx.fill();
+    if (ms >= 4) {
+      // 反射鏡50個：光線の上下の縁に、少しずれた版ずれの色
+      ctx.strokeStyle = pc('band', dayBlend()); ctx.globalAlpha = 0.85; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lampX + dir * 6, lampY + 4); ctx.lineTo(lampX + dir * len, lampY + len * wd + tilt + 2.5);
+      ctx.moveTo(lampX + dir * 6, lampY - 3); ctx.lineTo(lampX + dir * len, lampY - len * wd + tilt + 1.5); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     if (state && state.owned.mirror > 0) {
-      // 反射鏡があると、光線の芯がくっきりする
-      ctx.fillStyle = 'rgba(255,250,232,' + (0.25 + 0.25 * n) + ')';
+      // 反射鏡があると、光線の芯がくっきりする（25個から芯が太く明るく、光線の端まで）
+      var big = ms >= 3, cl = big ? 1 : 0.85, cw = big ? 0.045 : 0.02;
+      ctx.fillStyle = 'rgba(255,250,232,' + (big ? 0.45 + 0.3 * n : 0.25 + 0.25 * n) + ')';
       ctx.beginPath();
-      ctx.moveTo(lampX, lampY - 1);
-      ctx.lineTo(lampX + dir * len * 0.85, lampY - len * 0.02 + tilt * 0.85);
-      ctx.lineTo(lampX + dir * len * 0.85, lampY + len * 0.02 + tilt * 0.85);
-      ctx.lineTo(lampX, lampY + 1);
+      ctx.moveTo(lampX, lampY - (big ? 2 : 1));
+      ctx.lineTo(lampX + dir * len * cl, lampY - len * cw + tilt * cl);
+      ctx.lineTo(lampX + dir * len * cl, lampY + len * cw + tilt * cl);
+      ctx.lineTo(lampX, lampY + (big ? 2 : 1));
       ctx.closePath(); ctx.fill();
     }
   }
 
+  // 反射鏡100個：夜、灯室から空へ光の柱
+  function drawPillar() {
+    var n = nightness();
+    if (gs('mirror') < 5 || n < 0.3) return;
+    var off = towerOff(), w = W * 0.022;
+    ctx.fillStyle = 'rgba(255,244,214,' + (0.16 * n) + ')';
+    ctx.beginPath(); ctx.moveTo(lampX - w, VH * 0.2 + off); ctx.lineTo(lampX - w * 2.2, 0); ctx.lineTo(lampX + w * 2.2, 0); ctx.lineTo(lampX + w, VH * 0.2 + off); ctx.closePath(); ctx.fill();
+  }
   function drawGlow(flash) {
-    // 灯りのまわりの、刷った円の淡い光
-    var r = W * 0.075 * (1 + pulse * 0.5);
+    // 灯りのまわりの、刷った円の淡い光（フレネルレンズ10個から ひとまわり大きく）
+    var r = W * 0.075 * (1 + pulse * 0.5) * (gs('fresnel') >= 2 ? 1.3 : 1);
     ctx.fillStyle = 'rgba(255,240,200,' + Math.min(0.45, 0.1 + 0.1 * flash + 0.25 * pulse) + ')';
     ctx.beginPath(); ctx.arc(lampX, lampY, r, 0, 6.283); ctx.fill();
     ctx.fillStyle = 'rgba(255,240,200,' + Math.min(0.35, 0.05 + 0.2 * pulse) + ')';
@@ -2745,9 +2946,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       s.lit = Math.abs(d) < (d > 0 ? rl : ll) * 0.95;
       drawShip(s, t);
     }
-    drawPier(t); drawIsland(); drawHut(t); drawPathLamps(t); drawTower(); drawClockwork(); drawCreature(t);
+    drawPier(t); drawIsland(); drawHornHouse(t); drawDishes(); drawHut(t); drawPathLamps(t); drawPillar(); drawTower(); drawClockwork(); drawCreature(t);
     drawFog(t);
-    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples(); drawRankFx();
+    drawBeam(1, rl); drawBeam(-1, ll);
+    if (gs('clock') >= 5) {
+      // 回転機構100個：レンズが二面になり、背中合わせの2本目の光線
+      var c2 = -Math.sin(theta);
+      drawBeam(1, len * Math.pow(Math.max(0, c2), 1.4) * 0.85); drawBeam(-1, len * Math.pow(Math.max(0, -c2), 1.4) * 0.85);
+    } drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples(); drawRankFx();
     ctx.globalCompositeOperation = 'lighter';
     drawRankFlash();
     ctx.globalCompositeOperation = 'source-over';
