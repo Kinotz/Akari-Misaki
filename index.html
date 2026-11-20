@@ -531,7 +531,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   // 手触り：磨くと光線が一瞬伸び（beamKick）、灯りから光の粒（sparks）が舞う
   var beamKick = 0, sparks = [];
   // 買ったとき：景色のその設備のあたりに、刷った光の輪がひろがる
-  var buyRings = [];
+  var buyRings = [], ripples = [];
   function equipSpot(id) {
     var off = towerOff();
     switch (id) {
@@ -2221,6 +2221,21 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       ctx.fill(); ctx.stroke();
     }
   }
+  function drawRipples() {
+    for (var i = 0; i < ripples.length; i++) {
+      var r = ripples[i], k = r.age / 0.9;
+      ctx.globalAlpha = (1 - k) * 0.7; ctx.strokeStyle = '#FFF4D6'; ctx.lineWidth = 2;
+      for (var j = 0; j < 2; j++) {
+        var rad = 4 + (k * 26) - j * 8;
+        if (rad <= 0) continue;
+        ctx.beginPath();
+        if (r.sea) ctx.ellipse(r.x, r.y, rad, rad * 0.38, 0, 0, 6.283);
+        else ctx.arc(r.x, r.y, rad * 0.6, 0, 6.283);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
   function drawBuyRings() {
     for (var i = 0; i < buyRings.length; i++) {
       var r = buyRings[i], k = r.age / 0.8, rad = 8 + 34 * k;
@@ -2260,7 +2275,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     }
     drawPier(t); drawIsland(); drawHut(t); drawPathLamps(t); drawTower(); drawCreature(t);
     drawFog(t);
-    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings();
+    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples();
     ctx.globalCompositeOperation = 'lighter';
     drawRankFlash();
     ctx.globalCompositeOperation = 'source-over';
@@ -2276,6 +2291,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     theta += ((reduce ? 0.35 : 0.9) + 0.08 * Math.sqrt(state.owned.clock || 0)) * dt;
     pulse = Math.max(0, pulse - dt * 3);
     beamKick = Math.max(0, beamKick - dt * 2.2);
+    for (var pi = ripples.length - 1; pi >= 0; pi--) {
+      ripples[pi].age += dt;
+      if (ripples[pi].age > 0.9) ripples.splice(pi, 1);
+    }
     for (var bi = buyRings.length - 1; bi >= 0; bi--) {
       buyRings[bi].age += dt;
       if (buyRings[bi].age > 0.8) buyRings.splice(bi, 1);
@@ -2320,7 +2339,9 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
         var cdx = x - creature.x, cdy = y - creature.y0;
         if (Math.sqrt(cdx * cdx + cdy * cdy) < creature.hit) { e.preventDefault(); pokeCreature(); return; }
       }
-      if (Math.abs(x - lampX) < W * 0.09 && y > VH * 0.19 && y < VH * 0.82) { e.preventDefault(); polish(); }
+      if (Math.abs(x - lampX) < W * 0.09 && y > VH * 0.19 && y < VH * 0.82) { e.preventDefault(); polish(); return; }
+      // 何もない海や空：小さな波紋だけ返す（反応のない場所をなくす）
+      if (!reduce && y < VH) { ripples.push({ x: x, y: y, age: 0, sea: y > horizon }); if (ripples.length > 8) ripples.shift(); }
     });
     // 磨くボタンは長押しで連打できる(押し続けると毎秒6回ほど)
     var pb = $('polish'), holdWait = 0, holdRepeat = 0;
