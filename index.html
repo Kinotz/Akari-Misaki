@@ -644,7 +644,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   // 設備: 石油ランプから人工衛星管制局まで。cps は 1 台あたりの毎秒産出量。
   var GENS = [
-    { id: 'lamp',      name: '石油ランプ',       desc: '芯を整えて火を灯す。',                   base: 15,          cps: 0.1 },
+    { id: 'lamp',      name: '石油ランプ',       desc: '芯を整えて火を灯す。',                   base: 15,          cps: 0.25 },
     { id: 'mirror',    name: '反射鏡',           desc: '銀引きの鏡で光を一方向に集める。',       base: 100,         cps: 1 },
     { id: 'keeper',    name: '見習い灯台守',     desc: '夜通しレンズを拭いてくれる。',           base: 700,         cps: 8 },
     { id: 'clock',     name: '回転機構',         desc: '時計仕掛けの重りでレンズが回る。',       base: 12000,       cps: 47 },
@@ -1268,7 +1268,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (!bonus || bonus.done) return;
     bonus.done = true;
     buzz([20, 30, 20]); sfx('guide');
-    var reward = Math.max(100, cps() * 45);
+    var reward = Math.max(30, cps() * 45);
     gain(reward);
     var moored0 = harborCount();
     state.guided++;
