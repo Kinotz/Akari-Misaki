@@ -651,7 +651,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var nextBonus = 10, ambientTimer = 1, pulse = 0, theta = 0, rangeNow = 3;
   var creature = null, nextCreature = 35 + Math.random() * 35;
   // 景色の成長: 灯台の高さ(格に合わせて伸びる)、格上げの光、霧、衛星
-  var towerGrow = 0, rankFlash = 0;
+  var towerGrow = 0;
   // 手触り：磨くと光線が一瞬伸び（beamKick）、灯りから光の粒（sparks）が舞う
   var beamKick = 0, sparks = [], rankFx = 0;
   // 買ったとき：景色のその設備のあたりに、刷った光の輪がひろがる
@@ -1768,9 +1768,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (ri > state.rank) {
       for (var lv = state.rank + 1; lv <= ri; lv++) track('level_up', { level: lv });
       state.rank = ri;
-      rankFlash = 1; rankFx = 1;
+      rankFx = 1;
       buzz([30, 60, 40]);
-      sfx('rank');
+      sfx('rank'); sfx('horn');
+      if (!reduce) rankGhost = { off: towerOff(), age: 0 };
       showRankNews(RANKS[ri][1]);
     }
     $('light').textContent = fmtNum(Math.floor(state.light));
@@ -2663,9 +2664,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   function updateScenery(dt) {
     var target = rankIdx(rangeNow);
-    towerGrow += (target - towerGrow) * Math.min(1, dt * 1.2);
-    if (Math.abs(target - towerGrow) < 0.002) towerGrow = target;
-    rankFlash = Math.max(0, rankFlash - dt * 0.7);
+    // 格上げ：塔は約2.4秒かけて一定の速さで伸びる（reduced-motion ではすぐ）
+    var stepG = dt * (reduce ? 5 : 0.42);
+    towerGrow = target > towerGrow ? Math.min(target, towerGrow + stepG) : Math.max(target, towerGrow - stepG);
+    if (rankGhost) { rankGhost.age += dt; if (rankGhost.age > 4.5) rankGhost = null; }
     satT += dt;
     if (state.owned.horn > 0) {
       if (fogLeft > 0) {
@@ -2681,14 +2683,21 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     } else { fogTarget = 0; }
     fog += (fogTarget - fog) * Math.min(1, dt * 0.5);
   }
-  function drawRankFlash() {
-    if (rankFlash <= 0) return;
-    var r = Math.max(W, VH) * (0.4 + (1 - rankFlash) * 0.9);
-    var g = ctx.createRadialGradient(lampX, lampY, 0, lampX, lampY, r);
-    g.addColorStop(0, 'rgba(255,230,170,' + (0.55 * rankFlash) + ')');
-    g.addColorStop(1, 'rgba(255,214,138,0)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // 格上げの「前」：前の灯室・屋根・回廊の高さを、版ずれ色の線で4秒ほど残す（刷り残し）
+  var rankGhost = null;
+  function drawRankGhost() {
+    if (!rankGhost) return;
+    var a = Math.min(1, (4.5 - rankGhost.age) / 1.5), ph = dayBlend(), o = rankGhost.off;
+    var lw = W * 0.027 + 4, ltop = VH * 0.255 + o, lh = VH * 0.07, gy = VH * 0.325 + o, gw = W * 0.045;
+    ctx.globalAlpha = 0.85 * a; ctx.strokeStyle = pc('band', ph); ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(lampX - gw - 12, gy); ctx.lineTo(lampX + gw + 12, gy);
+    ctx.rect(lampX - lw + 4, ltop, (lw - 4) * 2, lh);
+    ctx.moveTo(lampX - lw, ltop); ctx.quadraticCurveTo(lampX, VH * 0.2 + o, lampX + lw, ltop);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
+
 
   function drawCreature(t) {
     if (!creature) return;
@@ -2987,14 +2996,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     // 格が上がった瞬間：灯台の後ろに刷った光の輪がひろがり、鳥が飛び立つ（文字は出さない）
     if (rankFx <= 0) return;
     var age = (1 - rankFx) * 3.2, a = Math.min(1, rankFx * 2);
-    for (var i = 0; i < 4; i++) {
-      var rad = age * 70 - i * 24;
-      if (rad <= 4) continue;
-      ctx.globalAlpha = a * 0.85; ctx.lineWidth = 6; ctx.strokeStyle = '#F2C14E';
-      ctx.beginPath(); ctx.arc(lampX, lampY, rad, 0, 6.283); ctx.stroke();
-      ctx.globalAlpha = a * 0.5; ctx.lineWidth = 2; ctx.strokeStyle = '#E2643F';
-      ctx.beginPath(); ctx.arc(lampX + 3, lampY + 2, rad, 0, 6.283); ctx.stroke();
-    }
+    // 版画の細い輪を2本だけ、1.2秒で（脈打たせない）
+    for (var i = 0; i < 2; i++) { var k = (age - i * 0.25) / 1.2; if (k > 0 && k < 1) printRing(lampX, lampY, k, 10, 64 + i * 10); }
     ctx.globalAlpha = a; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
     for (var b = 0; b < 5; b++) {
       var dir = b % 2 ? 1 : -1, bx = lampX + dir * (20 + b * 9 + age * (38 + b * 6)), by = lampY - 10 - b * 7 - age * (14 + b * 4);
@@ -3057,7 +3060,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       s.lit = Math.abs(d) < (d > 0 ? rl : ll) * 0.95;
       drawShip(s, t);
     }
-    drawPier(t); drawIsland(); drawHarbor(t); drawHornHouse(t); drawDishes(); drawHut(t); drawPathLamps(t); drawPillar(); drawTower(); drawClockwork(); drawCreature(t);
+    drawPier(t); drawIsland(); drawHarbor(t); drawHornHouse(t); drawDishes(); drawHut(t); drawPathLamps(t); drawPillar(); drawTower(); drawClockwork(); drawRankGhost(); drawCreature(t);
     drawFog(t);
     drawBeam(1, rl); drawBeam(-1, ll);
     if (gs('clock') >= 5) {
@@ -3065,9 +3068,6 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       var c2 = -Math.sin(theta);
       drawBeam(1, len * Math.pow(Math.max(0, c2), 1.4) * 0.85); drawBeam(-1, len * Math.pow(Math.max(0, -c2), 1.4) * 0.85);
     } drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples(); drawRankFx();
-    ctx.globalCompositeOperation = 'lighter';
-    drawRankFlash();
-    ctx.globalCompositeOperation = 'source-over';
     drawGrain();
     drawOverlays(t);
   }
