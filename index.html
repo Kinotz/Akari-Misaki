@@ -701,6 +701,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var MILES = [1, 10, 25, 50, 100];
   function stg(n) { var s = 0; for (var i = 0; i < MILES.length; i++) if (n >= MILES[i]) s = i + 1; return s; }
   function gs(id) { return state ? stg(state.owned[id] || 0) : 0; }
+  // 強化の跡：買った強化は、すでにある物に小さな跡を残す（新しい物は置かない）
+  function hasUp(id) { return !!(state && state.ups[id]); }
+  function tapUps() { var c = 0; ['cloth', 'chamois', 'abrasive', 'masterTap'].forEach(function (k) { if (hasUp(k)) c++; }); return c; }
+  var FRAME_COL = ['#33261F', '#8E98A3', '#B98E3A', '#D9A93A', '#E8B83A'];   // 磨く強化の数で、灯室の枠が 墨→銀→真鍮→金
   // 節目をまたいで買ったときに、手帳に出す1行（20字以内）。[段2, 段3, 段4, 段5]
   var MILE_TEXT = {
     lamp: ['小径の灯が、灯りの並木になった', '並木の灯が、背をのばした', '夜の岬から、天灯が昇りはじめた', '天灯がふえ、岬の夜がにぎやかに'],
@@ -2036,11 +2040,12 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var starVis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
     if (starVis > 0.02) {
       ctx.fillStyle = '#F3E6C4';
+      var clearAir = hasUp('air');
       for (var k = 0; k < stars.length; k++) {
         var st = stars[k];
         var a = reduce ? 0.7 : 0.55 + 0.35 * Math.sin(t * st.sp + st.ph);
         ctx.globalAlpha = Math.max(0, a * starVis);
-        ctx.beginPath(); ctx.arc(st.x, st.y, st.r * 0.9 + 0.4, 0, 6.283); ctx.fill();
+        ctx.beginPath(); ctx.arc(st.x, st.y, st.r * 0.9 + (clearAir ? 0.9 : 0.4), 0, 6.283); ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
@@ -2168,14 +2173,15 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     ctx.fillStyle = pc('sea', ph); ctx.fillRect(0, horizon, W, H - horizon);
     drawMoonGlitter(t, ph);
     // 波：小さな弧の列（版画の模様）。行ごとに逆向きにゆっくり流れる
-    ctx.strokeStyle = pc('wave', ph); ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    var calm = hasUp('calm'), wh = calm ? 4.5 : 8;
+    ctx.strokeStyle = pc('wave', ph); ctx.lineWidth = calm ? 1.6 : 2.2; ctx.lineCap = 'round';
     var rows = 6, step = 44 * W / 360, drift = reduce ? 0 : (t * 4) % step;
     for (var r = 0; r < rows; r++) {
       var y = horizon + 16 + r * (seaBottom() - horizon + 30) / rows;
       var off = (r % 2) * step / 2 + (r % 2 ? -drift : drift);
       ctx.beginPath();
       for (var x = -step * 2 + off; x < W + step; x += step) {
-        ctx.moveTo(x, y); ctx.quadraticCurveTo(x + step * 0.25, y - 8, x + step * 0.5, y);
+        ctx.moveTo(x, y); ctx.quadraticCurveTo(x + step * 0.25, y - wh, x + step * 0.5, y);
       }
       ctx.stroke();
     }
@@ -2257,6 +2263,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     ctx.moveTo(W * 0.64, VH * 0.86); ctx.quadraticCurveTo(W * 0.67, VH * 0.845, W * 0.7, VH * 0.86);
     ctx.moveTo(W * 0.44, VH * 0.95); ctx.quadraticCurveTo(W * 0.47, VH * 0.935, W * 0.5, VH * 0.95);
     ctx.stroke();
+    if (hasUp('spring')) {
+      // 大潮：岬のすそに、潮が満ちた跡の白い線
+      ctx.strokeStyle = 'rgba(255,248,230,0.6)'; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(W * 0.135, VH * 1.0); ctx.lineTo(W * 0.285, VH * 0.895);
+      ctx.moveTo(W * 0.865, VH * 1.0); ctx.lineTo(W * 0.715, VH * 0.895);
+      ctx.stroke();
+    }
   }
 
   // ---------- 設備が景色に現れる（節目 1・10・25・50・100 で姿を変える） ----------
@@ -2293,6 +2307,13 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       }
       ctx.restore();
     }
+    if (hasUp('manual')) {
+      // 灯台守の手引き：小屋の軒に、吊るしたランタン
+      var m0 = houseSpot(0), mx = m0.x + W * 0.042, my = m0.y - VH * 0.045;
+      ctx.fillStyle = '#33261F'; ctx.fillRect(mx - 0.5, my - 4, 1, 4);
+      ctx.fillStyle = '#F2C14E'; ctx.fillRect(mx - 2, my, 4, 5); ctx.strokeStyle = '#33261F'; ctx.lineWidth = 0.8; ctx.strokeRect(mx - 2, my, 4, 5);
+      if (n > 0.3) { ctx.globalAlpha = 0.3 * n; ctx.beginPath(); ctx.arc(mx, my + 2.5, 6, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; }
+    }
     if (s >= 5) {
       // 灯台守の村：小屋の上に小さな旗
       var p0 = houseSpot(0), fy = p0.y - VH * 0.085, wv = reduce ? 0 : Math.sin(t * 3) * 1.5;
@@ -2307,7 +2328,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   function drawPathLamps(t) {
     if (!state || state.owned.lamp < 1) return;
     var s = gs('lamp'), n = nightness(), cnt = shownCount('lamp'), tall = s >= 3 ? 4 : 0;
-    var head = n > 0.3 ? '#F2C14E' : '#E8D7A8';
+    var oil = hasUp('rapeseed'), head = n > 0.3 || oil ? '#F2C14E' : '#E8D7A8';
     if (s >= 2) {
       // 並木：同じ側の灯どうしを、たわんだ綱でつなぎ、小さな灯をつるす
       [[0.215, 0.31, 0.405, 0.435], [0.565, 0.595, 0.69, 0.81]].forEach(function (side) {
@@ -2331,7 +2352,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (n > 0.3) {
         ctx.globalAlpha = (s >= 3 ? 0.3 : 0.22) * n * (reduce ? 1 : 0.85 + 0.15 * Math.sin(t * 2.6 + i * 1.7));
         ctx.fillStyle = '#F2C14E';
-        ctx.beginPath(); ctx.arc(x, y - 13 - tall, s >= 3 ? 11 : 8, 0, 6.283); ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y - 13 - tall, (s >= 3 ? 11 : 8) + (oil ? 2 : 0), 0, 6.283); ctx.fill();
         ctx.globalAlpha = 1;
       }
       ctx.fillStyle = '#33261F'; ctx.fillRect(x - 0.8, y - 10 - tall, 1.6, 10 + tall);
@@ -2432,6 +2453,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       var ang = (reduce ? 0.6 : t * (0.9 + i * 0.07)) + i * 1.3;
       ctx.lineWidth = 1.6;
       for (var k2 = 0; k2 < 3; k2++) { var a2 = ang + k2 * 2.094; ctx.beginPath(); ctx.moveTo(x, hubY); ctx.lineTo(x + Math.cos(a2) * blade, hubY + Math.sin(a2) * blade); ctx.stroke(); }
+      if (hasUp('windtech')) {
+        ctx.strokeStyle = '#E2643F';
+        for (var k4 = 0; k4 < 3; k4++) { var a4 = ang + k4 * 2.094; ctx.beginPath(); ctx.moveTo(x + Math.cos(a4) * blade * 0.7, hubY + Math.sin(a4) * blade * 0.7); ctx.lineTo(x + Math.cos(a4) * blade, hubY + Math.sin(a4) * blade); ctx.stroke(); }
+      }
       var blink = reduce ? 0.7 : (Math.sin(t * 2.4 + i * 0.9) > 0.6 ? 1 : 0.25);
       ctx.globalAlpha = blink; ctx.fillStyle = '#E2643F';
       ctx.beginPath(); ctx.arc(x, hubY - 1, 1.8, 0, 6.283); ctx.fill();
@@ -2491,7 +2516,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.fillStyle = '#33261F'; ctx.fillRect(x - 1, y - 12, 2, 12);
       ctx.fillStyle = '#FBF6EA'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.ellipse(x - 2, y - 14, r, r * 0.5, -0.6, 0, Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#E2643F'; ctx.beginPath(); ctx.arc(x - 2.5, y - 18, 1.5, 0, 6.283); ctx.fill();
+      ctx.fillStyle = hasUp('satcal') ? '#F2C14E' : '#E2643F'; ctx.beginPath(); ctx.arc(x - 2.5, y - 18, hasUp('satcal') ? 2.2 : 1.5, 0, 6.283); ctx.fill();
       ctx.restore();
     }
   }
@@ -2634,6 +2659,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.moveTo(hx - side * 4, hy - 1.5); ctx.lineTo(hx + side * 6 * sc, hy - 3.5 * sc); ctx.lineTo(hx + side * 9 * sc, hy - 7 * sc);
       ctx.lineTo(hx + side * 9 * sc, hy + 5 * sc); ctx.lineTo(hx + side * 6 * sc, hy + 1.5 * sc); ctx.lineTo(hx - side * 4, hy + 1.5); ctx.closePath();
       ctx.fill(); ctx.stroke();
+      if (hasUp('amp')) { ctx.fillStyle = '#E2643F'; ctx.fillRect(hx + side * (side > 0 ? 6.5 : 8.5) * sc, hy - 5 * sc, 2 * sc, 8.5 * sc); ctx.fillStyle = '#C9A24A'; }
     }
     ctx.restore();
   }
@@ -2857,7 +2883,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     ctx.beginPath(); ctx.rect(lampX - lw, ltop, lw * 2, lh); ctx.clip();
     if (state && state.owned.mirror > 0) {
       // 反射鏡：灯室の奥に銀の反射板
-      ctx.fillStyle = 'rgba(214,220,226,0.95)';
+      ctx.fillStyle = hasUp('silver') ? 'rgba(244,248,252,1)' : 'rgba(214,220,226,0.95)';
       ctx.beginPath(); ctx.arc(lampX + lw * 0.55, cy, lw * 0.75, Math.PI / 2, Math.PI * 1.5); ctx.closePath(); ctx.fill();
       if (gs('mirror') >= 2) { ctx.beginPath(); ctx.arc(lampX - lw * 0.55, cy, lw * 0.75, -Math.PI / 2, Math.PI / 2); ctx.closePath(); ctx.fill(); }
     }
@@ -2867,7 +2893,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       for (var ri = 1; ri <= 3; ri++) { ctx.beginPath(); ctx.arc(lampX, cy, lw * 0.3 * ri, 0, 6.283); ctx.stroke(); }
     }
     ctx.restore();
-    ctx.fillStyle = ink;
+    if (hasUp('prism')) {
+      // プリズムの再研磨：レンズの中に三色の点
+      ctx.fillStyle = '#2F8080'; ctx.fillRect(lampX - lw * 0.6, cy - 2, 2.2, 2.2);
+      ctx.fillStyle = '#E2643F'; ctx.fillRect(lampX - 1, cy + 2, 2.2, 2.2);
+      ctx.fillStyle = '#7FA6E0'; ctx.fillRect(lampX + lw * 0.45, cy - 3, 2.2, 2.2);
+    }
+    var fc = FRAME_COL[tapUps()];
+    ctx.fillStyle = fc;
     ctx.fillRect(lampX - lw, ltop, 2, lh); ctx.fillRect(lampX - 1, ltop, 2, lh); ctx.fillRect(lampX + lw - 2, ltop, 2, lh);
     if (towerGrow >= 1) {
       // 回廊の手すり
@@ -2875,6 +2908,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.fillRect(lampX - gw, gy - 7, gw * 2, 1.6);
       for (var k = -3; k <= 3; k++) ctx.fillRect(lampX + k * gw / 3.2 - 0.7, gy - 7, 1.4, 7);
     }
+    ctx.fillStyle = ink;
     if (gs('fresnel') >= 4) {
       // フレネル50個：灯室の下に、もう一段の回廊
       var gy2 = VH * 0.325 + off + 9, gw2 = W * 0.05;
@@ -2900,8 +2934,13 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.beginPath(); ctx.moveTo(lampX + 1, fy); ctx.quadraticCurveTo(lampX + 9, fy + 2 + wv, lampX + 16, fy - 1 + wv);
       ctx.lineTo(lampX + 12, fy + 4 + wv); ctx.quadraticCurveTo(lampX + 7, fy + 7, lampX + 1, fy + 6); ctx.closePath(); ctx.fill();
     }
-    if (towerGrow >= 4.5) {
-      // 最上位の格では、てっぺんに金の飾り
+    if (tapUps() >= 4) {
+      // 磨く強化をすべて：屋根の縁に金の線
+      ctx.strokeStyle = '#E8B83A'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(lampX - lw - 4, ltop - 0.5); ctx.quadraticCurveTo(lampX, VH * 0.2 + off + 4, lampX + lw + 4, ltop - 0.5); ctx.stroke();
+    }
+    if (towerGrow >= 4.5 || hasUp('eternal')) {
+      // 最上位の格、または「永遠の灯」で、てっぺんに金の飾り
       ctx.fillStyle = '#F2C14E';
       ctx.beginPath(); ctx.arc(lampX, VH * 0.186 + off, 2.6, 0, 6.283); ctx.fill();
     }
@@ -2910,7 +2949,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   // 回転機構：灯室の窓の中を、光線の向きに合わせて明るい縞が横切る（レンズ板が回る）。塔の右に真鍮の歯車
   function gear(x, y, r, a, teeth) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(a);
-    ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1;
+    ctx.fillStyle = hasUp('gear') ? '#F2C14E' : '#C9A24A'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1;
     ctx.beginPath();
     for (var i = 0; i < teeth * 2; i++) { var rr = i % 2 ? r : r * 1.28, an = i * Math.PI / teeth; ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
     ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -3062,7 +3101,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     for (var i = 0; i < sparks.length; i++) {
       var sk = sparks[i], a = 1 - sk.age / sk.life;
       ctx.globalAlpha = Math.max(0, a);
-      ctx.fillStyle = '#FFF4D6';
+      ctx.fillStyle = hasUp('hands') ? '#F2C14E' : '#FFF4D6';
       ctx.beginPath(); ctx.arc(sk.x, sk.y, sk.r, 0, 6.283); ctx.fill();
     }
     ctx.globalAlpha = 1;
