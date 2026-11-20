@@ -174,28 +174,34 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 .list { display: flex; flex-direction: column; }
 .row {
-  position: relative;
-  display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;
-  width: 100%; min-height: 56px; padding: 8px 0; text-align: left; cursor: pointer; color: var(--ink-b);
-  background: transparent; border: 0; border-bottom: 2px dotted var(--rule);
+  display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px;
+  min-height: 52px; border-bottom: 2px dotted var(--rule);
 }
-.row:disabled { cursor: default; }
-.row .own { font: 700 15px/1 var(--font-display); font-variant-numeric: tabular-nums; text-align: right; }
-.row .info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.row .name { font: 700 16px/1.35 var(--font-display); }
-.row .desc { font-size: 13px; line-height: 1.5; }
-.row .rate { font-size: 13px; font-variant-numeric: tabular-nums; }
-.row .buy {
-  min-width: 84px; padding: 4px 8px; text-align: center; display: flex; flex-direction: column; align-items: center;
-  border: 2.5px solid var(--ink-b); background: var(--paper); transform: rotate(-1.2deg);
+.row-main {
+  display: flex; align-items: baseline; gap: 8px; min-height: 48px; min-width: 0; padding: 0;
+  background: none; border: 0; text-align: left; color: var(--ink-b); cursor: pointer;
 }
-.row .cost { font: 700 16px/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
-.row .unit { font-size: 13px; }
-.row.afford .buy { background: var(--accent); border-color: var(--accent); color: var(--on); box-shadow: 3px 2px 0 var(--ink-b); }
-.row.locked { cursor: default; }
-.row.bought .buy { animation: stamp 0.35s ease-out; }
-@keyframes stamp { 0% { transform: rotate(-1.2deg) scale(0.9); } 60% { transform: rotate(-1.2deg) scale(1.04); } 100% { transform: rotate(-1.2deg) scale(1); } }
-.empty { margin: 0; padding: 16px 0; font-size: 15px; border-bottom: 2px dotted var(--rule); }
+.row-main .name { font: 700 16px/1.35 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-main .own { margin-left: auto; font-size: 15px; }
+/* 値段の札：買える＝色で塗り＋白文字＋墨茶のずれ影／買えない＝紙の地＋墨茶の枠線（塗りなし） */
+.price {
+  min-width: 88px; height: 40px; padding: 0 8px; border: 2.5px solid var(--ink-b); border-radius: 0;
+  background: transparent; color: var(--ink-b); font: 700 16px/1 var(--font-display); font-variant-numeric: tabular-nums;
+  transform: rotate(-1.2deg); cursor: pointer; white-space: nowrap;
+}
+.price small { font-size: 13px; margin-left: 3px; }
+.price.ok { background: var(--accent); border-color: var(--accent); color: var(--on); box-shadow: 3px 2px 0 var(--ink-b); }
+.detail { grid-column: 1 / -1; padding: 0 0 10px; }
+.detail p { margin: 0; font-size: 15px; line-height: 1.5; }
+.detail .sub { font-size: 13px; margin-top: 2px; }
+.detail .sub:empty { display: none; }
+.row.tz { display: block; min-height: 0; padding: 12px 0; }
+.tz-text { margin: 0; font-size: 15px; }
+.row.bought .price { animation: stamp 0.35s ease-out; }
+@keyframes stamp { 0% { transform: rotate(-1.2deg) scale(0.88); } 60% { transform: rotate(-1.2deg) scale(1.05); } 100% { transform: rotate(-1.2deg) scale(1); } }
+.row.shake .price { animation: shake 0.3s ease-out; }
+@keyframes shake { 0%, 100% { transform: rotate(-1.2deg) translateX(0); } 25% { transform: rotate(-1.2deg) translateX(-4px); } 75% { transform: rotate(-1.2deg) translateX(4px); } }
+.empty { margin: 0; padding: 14px 0; font-size: 15px; border-bottom: 2px dotted var(--rule); }
 
 /* 岬の生き物(図鑑) */
 .zukan { display: flex; flex-direction: column; gap: 8px; }
@@ -307,7 +313,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .row.bought .buy { animation: none; }
+  .row.bought .price, .row.shake .price { animation: none; }
   .polish, .polish * { transition: none !important; animation: none !important; }
 }
 </style>
@@ -706,13 +712,14 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     if (state.ups[id] || state.light < u.cost) return;
     state.light -= u.cost;
     state.ups[id] = true;
-    sfx('buy');
+    sfx('buy'); flashRow(upEls[id] && upEls[id].row);
     renderAll(); save();
   }
   function flashRow(el) {
     if (!el) return;
     el.classList.remove('bought'); void el.offsetWidth; el.classList.add('bought');
   }
+
   function guide() {
     if (!bonus || bonus.done) return;
     bonus.done = true;
@@ -988,28 +995,55 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   // ---------- 画面の更新 ----------
   var genEls = {}, teaserEl = null, upList = $('upList'), genList = $('genList');
 
+  // 買い物の1行：［名前・持っている数］（押すと説明が開く）と［値段の札］（押すと買う）
+  function makeRow(name, onBuy) {
+    var row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = '<button class="row-main" type="button" aria-expanded="false"><span class="name"></span><span class="own num"></span></button>' +
+      '<button class="price num" type="button"></button>' +
+      '<div class="detail" hidden><p class="desc"></p><p class="sub num"></p></div>';
+    var el = {
+      row: row, main: row.querySelector('.row-main'), own: row.querySelector('.own'), price: row.querySelector('.price'),
+      detail: row.querySelector('.detail'), desc: row.querySelector('.desc'), sub: row.querySelector('.sub')
+    };
+    row.querySelector('.name').textContent = name;
+    el.main.addEventListener('click', function () {
+      var open = el.detail.hidden;
+      el.detail.hidden = !open;
+      el.main.setAttribute('aria-expanded', open ? 'true' : 'false');
+      renderAll();
+    });
+    el.price.addEventListener('click', function () {
+      if (el.price.getAttribute('aria-disabled') === 'true') {
+        // 買えないときは、札が小さく揺れて残りを知らせる
+        row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake');
+        return;
+      }
+      onBuy();
+    });
+    return el;
+  }
+  function setPrice(el, text, ok, label) {
+    if (el.priceText !== text) { el.price.innerHTML = text; el.priceText = text; }
+    el.price.classList.toggle('ok', ok);
+    el.price.setAttribute('aria-disabled', ok ? 'false' : 'true');
+    el.price.setAttribute('aria-label', label);
+  }
   function buildGens() {
     genList.innerHTML = '';
     GENS.forEach(function (g) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'row'; b.hidden = true;
-      b.innerHTML = '<span class="own">0</span>' +
-        '<span class="info"><span class="name">' + g.name + '</span><span class="desc">' + g.desc + '</span><span class="rate"></span></span>' +
-        '<span class="buy"><span class="cost"></span><span class="unit"></span></span>';
-      b.addEventListener('click', function () { buyGen(g.id); });
-      genList.appendChild(b);
-      genEls[g.id] = {
-        row: b, own: b.querySelector('.own'), rate: b.querySelector('.rate'),
-        cost: b.querySelector('.cost'), unit: b.querySelector('.unit')
-      };
+      var el = makeRow(g.name, function () { buyGen(g.id); });
+      el.desc.textContent = g.desc;
+      el.row.hidden = true;
+      genList.appendChild(el.row);
+      genEls[g.id] = el;
     });
     teaserEl = document.createElement('div');
-    teaserEl.className = 'row locked'; teaserEl.hidden = true;
-    teaserEl.innerHTML = '<span class="own">?</span><span class="info"><span class="name">？？？</span><span class="desc">もっと光を集めると、新しい設備が見えてきます。</span></span><span></span>';
+    teaserEl.className = 'row tz'; teaserEl.hidden = true;
+    teaserEl.innerHTML = '<p class="tz-text">もっと光を集めると、新しい設備が見えてきます。</p>';
     genList.appendChild(teaserEl);
   }
 
-  // 買えるまでの目安時間(毎秒の産出から計算)
   function waitText(need) {
     var c = cps();
     if (need <= 0 || c <= 0) return '';
@@ -1030,18 +1064,15 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       var e = genEls[g.id], own = state.owned[g.id];
       var show = genShown(i);
       e.row.hidden = !show;
-      if (!show) {
-        if (!teaserShown) { teaserShown = true; }
-        return;
-      }
+      if (!show) { teaserShown = true; return; }
       var p = plan(g), ok = state.light >= p.cost, u = unit(g);
       e.own.textContent = own;
-      e.rate.textContent = '各 +' + fmtNum(u) + '/秒' + (own > 0 ? ' ・ 計 ' + fmtNum(own * u) + '/秒' : '');
-      e.cost.textContent = fmtNum(p.cost);
-      var wt = ok ? '' : waitText(p.cost - state.light);
-      e.unit.textContent = wt || (p.n > 1 ? '光 ×' + p.n : '光');
-      e.row.classList.toggle('afford', ok);
-      e.row.disabled = !ok;
+      setPrice(e, fmtNum(p.cost) + (p.n > 1 ? '<small>×' + p.n + '</small>' : ''), ok,
+        g.name + (p.n > 1 ? 'を' + p.n + '台' : '') + '　' + fmtNum(p.cost) + ' 光' + (ok ? '' : '（足りません）'));
+      if (!e.detail.hidden) {
+        var wt = ok ? '' : waitText(p.cost - state.light);
+        e.sub.textContent = '1台 +' + fmtNum(u) + '/秒' + (own > 0 ? '・いま 計 ' + fmtNum(own * u) + '/秒' : '') + (wt ? '・' + wt + 'で買えます' : '');
+      }
     });
     teaserEl.hidden = !teaserShown;
   }
@@ -1051,11 +1082,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] > 0);
     }).sort(function (a, b) { return a.cost - b.cost; });
   }
+  var upEls = {};
   function renderUps() {
     var list = visibleUps(), sig = list.map(function (u) { return u.id; }).join(',');
     if (sig !== upSig) {
       upSig = sig;
-      upList.innerHTML = '';
+      upList.innerHTML = ''; upEls = {};
       if (!list.length) {
         var p = document.createElement('p');
         p.className = 'empty';
@@ -1063,31 +1095,29 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
         upList.appendChild(p);
       }
       list.forEach(function (u) {
-        var b = document.createElement('button');
-        b.type = 'button'; b.className = 'row kind'; b.dataset.id = u.id;
-        var tag = u.tap || u.share ? '磨' : u.gen ? '設' : '全';
-        b.innerHTML = '<span class="own">' + tag + '</span>' +
-          '<span class="info"><span class="name">' + u.name + '</span><span class="desc">' + u.desc + '</span></span>' +
-          '<span class="buy"><span class="cost">' + fmtNum(u.cost) + '</span><span class="unit">光</span></span>';
-        b.addEventListener('click', function () { buyUp(u.id); });
-        upList.appendChild(b);
+        var el = makeRow(u.name, function () { buyUp(u.id); });
+        el.desc.textContent = u.desc;
+        el.own.textContent = '';
+        el.row.dataset.id = u.id;
+        upList.appendChild(el.row);
+        upEls[u.id] = el;
       });
     }
-    var rows = upList.querySelectorAll('.row'), canBuy = 0;
-    for (var i = 0; i < rows.length; i++) {
-      var uc = UMAP[rows[i].dataset.id].cost, ok = state.light >= uc;
-      var un = rows[i].querySelector('.unit');
-      if (un) un.textContent = ok ? '光' : (waitText(uc - state.light) || '光');
+    var canBuy = 0;
+    list.forEach(function (u) {
+      var el = upEls[u.id], ok = state.light >= u.cost;
       if (ok) canBuy++;
-      rows[i].classList.toggle('afford', ok);
-      rows[i].disabled = !ok;
-    }
+      setPrice(el, fmtNum(u.cost), ok, u.name + '　' + fmtNum(u.cost) + ' 光' + (ok ? '' : '（足りません）'));
+      if (!el.detail.hidden) {
+        var wt = ok ? '' : waitText(u.cost - state.light);
+        el.sub.textContent = wt ? wt + 'で買えます' : '';
+      }
+    });
     $('upDot').hidden = upList.hidden === false || canBuy === 0;
     var bought = UPS.filter(function (u) { return state.ups[u.id]; }).length;
     $('upCount').textContent = bought + '/' + UPS.length;
   }
 
-  // 次の目標: まだ持っていない設備と買える強化のうち、いちばん安いもの。買えるものがあれば知らせる。
   function renderGoal() {
     var cands = [], i;
     for (i = 0; i < GENS.length; i++) {
