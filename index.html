@@ -364,7 +364,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     </section>
 
     <section class="shop" aria-label="岬の備え">
-      <div class="tabs" role="tablist">
+      <div class="tabs" id="tabs" role="tablist">
         <button class="tab" id="tabGen" role="tab" aria-selected="true" aria-controls="genList" type="button">設備</button>
         <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/17</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
         <div class="qty" id="qty" role="group" aria-label="まとめ買い">
@@ -590,7 +590,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     GENS.forEach(function (g) { owned[g.id] = 0; });
     var met = {};
     KINDS.forEach(function (k) { met[k.id] = 0; });
-    return { v: 1, light: 0, total: 0, taps: 0, guided: 0, found: 0, owned: owned, ups: {}, met: met, rank: 0, boostUntil: 0, seen: Date.now() };
+    // ui: 強化タブ(up)・まとめ買い(qty)を一度出したら 1（出したまま）。古いセーブに無いときはこの既定値で補う
+    return { v: 1, light: 0, total: 0, taps: 0, guided: 0, found: 0, owned: owned, ups: {}, met: met, rank: 0, boostUntil: 0, seen: Date.now(), ui: { up: 0, qty: 0 } };
   }
   function sanitize(s) {
     if (!s || typeof s !== 'object') return null;
@@ -609,6 +610,9 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     });
     // 図鑑ができる前のセーブ: 見つけたタコの数を引き継ぐ
     if (!s.met && b.found > 0) b.met.octopus = b.found;
+    if (s.ui && typeof s.ui === 'object') {
+      ['up', 'qty'].forEach(function (k) { if (s.ui[k] === 1) b.ui[k] = 1; });
+    }
     return b;
   }
   function load() {
@@ -1082,6 +1086,18 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] > 0);
     }).sort(function (a, b) { return a.cost - b.cost; });
   }
+  // 強化タブは最初の強化が見えたとき、まとめ買いは設備を合計10個持ったときに出す（一度出たら出したまま）
+  function renderReveal() {
+    var ownedSum = 0;
+    GENS.forEach(function (g) { ownedSum += state.owned[g.id]; });
+    if (!state.ui.up && (visibleUps().length > 0 || UPS.some(function (u) { return state.ups[u.id]; }))) state.ui.up = 1;
+    if (!state.ui.qty && ownedSum >= 10) state.ui.qty = 1;
+    var tg = $('tabGen'), tu = $('tabUp'), q = $('qty');
+    tg.hidden = tu.hidden = !state.ui.up;
+    q.hidden = !state.ui.qty || upList.hidden === false;
+    $('tabs').hidden = !state.ui.up && !state.ui.qty;
+    if (!state.ui.qty && qty !== 1) qty = 1;
+  }
   var upEls = {};
   function renderUps() {
     var list = visibleUps(), sig = list.map(function (u) { return u.id; }).join(',');
@@ -1223,6 +1239,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     $('stTaps').textContent = state.taps.toLocaleString('ja-JP') + '回';
     $('stTotal').textContent = fmtNum(Math.floor(state.total));
     $('hint').hidden = state.guided >= 1 || state.taps >= 100;
+    renderReveal();
     renderGens();
     renderUps();
     renderBoost();
@@ -2144,7 +2161,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     function showTab(gen) {
       tg.setAttribute('aria-selected', gen ? 'true' : 'false');
       tu.setAttribute('aria-selected', gen ? 'false' : 'true');
-      genList.hidden = !gen; upList.hidden = gen; qtyEl.hidden = !gen;
+      genList.hidden = !gen; upList.hidden = gen; qtyEl.hidden = !gen || !state.ui.qty;
     }
     tg.addEventListener('click', function () { showTab(true); });
     tu.addEventListener('click', function () { showTab(false); });
