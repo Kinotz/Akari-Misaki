@@ -676,6 +676,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (id === 'wind') return { x: W * TURBINE_X[idx], y: horizon + 1 - VH * 0.075 };
       if (id === 'plant') { var pl = pierLight(idx, shownCount('plant')); return { x: pl.x, y: pl.y - 9 }; }
       if (id === 'keeper') { var hp = houseSpot(idx); return { x: hp.x, y: hp.y - VH * 0.035 }; }
+      if (id === 'harbor') { var bs = boatSpot(idx); return { x: bs.x, y: bs.y - 7 }; }
     }
     return equipSpot(id);
   }
@@ -1154,7 +1155,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     state.light -= p.cost;
     state.owned[id] += p.n;
     var stage1 = stg(state.owned[id]);
-    if (stage1 > stage0 && stage1 >= 2) toast(MILE_TEXT[id][stage1 - 2], 3200, 2, 'mile');
+    if (stage1 > stage0 && stage1 >= 2) toast(MILE_TEXT[id][stage1 - 2], 3200, 2, 'mile-' + id);   // 設備ごとに1行（同時にまたいでも両方出す）
     pulse = Math.max(pulse, 0.6);
     // 増えた1つがあればそれを、なければその設備の飾りを跳ねさせ、そこに刷った輪
     var newIdx = shownCount(id) > shown0 && (id === 'lamp' || id === 'wind' || id === 'plant' || id === 'keeper') ? shownCount(id) - 1 : null;
@@ -1182,7 +1183,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     buzz([20, 30, 20]); sfx('guide');
     var reward = Math.max(100, cps() * 45);
     gain(reward);
+    var moored0 = harborCount();
     state.guided++;
+    if (harborCount() > moored0) { popStart('harbor', harborCount() - 1); ringAt('harbor', harborCount() - 1); }
     if ([1, 10, 50, 100].indexOf(state.guided) >= 0) track('ship_guided', { count: state.guided });
     showGain(reward);
     toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
@@ -2272,7 +2275,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.beginPath(); ctx.moveTo(x - hw / 2 - 3, y - hh); ctx.lineTo(x, y - hh - VH * 0.035); ctx.lineTo(x + hw / 2 + 3, y - hh); ctx.closePath(); ctx.fill();
       var ww = hw * 0.26, wh = hh * 0.42, wx = x - hw * 0.28, wy = y - hh * 0.7;
       ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#33261F'; ctx.fillRect(wx, wy, ww, wh);
-      if (n > 0.3) { ctx.globalAlpha = 0.22 * n; ctx.beginPath(); ctx.arc(wx + ww / 2, wy + wh / 2, hw * 0.4, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; }
+      var ls = gs('lamp');
+      if (ls >= 3) ctx.fillRect(x + hw * 0.06, wy, ww, wh);                      // 灯25個から、2つめの窓にも灯
+      if (ls >= 4 && n > 0.3) { ctx.fillRect(x + hw * 0.38 - 1.5, y - 5, 3, 5); }  // 灯50個から、戸口の灯
+      if (n > 0.3) { ctx.globalAlpha = 0.22 * n * (ls >= 3 ? 1.4 : 1); ctx.beginPath(); ctx.arc(x, wy + wh / 2, hw * (ls >= 3 ? 0.55 : 0.4), 0, 6.283); ctx.fill(); ctx.globalAlpha = 1; }
       if (i === 0 && s >= 2) {
         // 煙突と、ゆっくり昇る煙（刷った小さな丸）
         ctx.fillStyle = '#33261F'; ctx.fillRect(x + hw * 0.22, y - hh - VH * 0.03, 3, VH * 0.022);
@@ -2484,6 +2490,33 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.fillStyle = '#FBF6EA'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.ellipse(x - 2, y - 14, r, r * 0.5, -0.6, 0, Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#E2643F'; ctx.beginPath(); ctx.arc(x - 2.5, y - 18, 1.5, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // 岬の物語：金の船を導くたびに、岬の左手前の船着き場にもやう船がふえる（1・3・10・30・100隻）
+  var HARBOR_AT = [1, 3, 10, 30, 100];
+  function harborCount() { var g = state ? state.guided : 0, c = 0; for (var i = 0; i < HARBOR_AT.length; i++) if (g >= HARBOR_AT[i]) c++; return c; }
+  function boatSpot(i) { return { x: W * (0.03 + i * 0.036) + 4, y: VH * 0.955 - 2 }; }
+  function drawHarbor(t) {
+    var c = harborCount();
+    if (!c) return;
+    var ph = dayBlend(), n = nightness(), y = VH * 0.955;
+    ctx.fillStyle = pc('isleGhost', ph); ctx.fillRect(-2, y + 1.5, W * 0.2 + 2, 4);
+    ctx.fillStyle = pc('isle', ph); ctx.fillRect(-4, y, W * 0.2 + 4, 4);
+    for (var i = 0; i < c; i++) {
+      var bp = boatSpot(i), bx = bp.x, by = bp.y + (reduce ? 0 : Math.sin(t * 1.2 + i) * 0.8);
+      ctx.save(); popAround('harbor', i, bx, by);
+      ctx.translate(bx, by); ctx.scale(1.2, 1.2); ctx.translate(-bx, -by);
+      ctx.fillStyle = i === 4 ? '#C9A24A' : pc('hull', ph);
+      ctx.beginPath(); ctx.moveTo(bx - 6, by - 4); ctx.lineTo(bx + 6, by - 4); ctx.lineTo(bx + 4, by); ctx.lineTo(bx - 4, by); ctx.closePath(); ctx.fill();
+      ctx.fillRect(bx - 0.5, by - 14, 1, 10);
+      ctx.fillStyle = i === 4 ? '#F2C14E' : '#FBF1DC';
+      ctx.beginPath(); ctx.moveTo(bx + 0.8, by - 13); ctx.lineTo(bx + 0.8, by - 5); ctx.lineTo(bx + 5, by - 5); ctx.closePath(); ctx.fill();
+      if (n > 0.3) {
+        ctx.fillStyle = '#FFF4CF'; ctx.globalAlpha = n; ctx.beginPath(); ctx.arc(bx - 0.2, by - 15, 1.2, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 0.25 * n; ctx.beginPath(); ctx.arc(bx - 0.2, by - 15, 4, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
       ctx.restore();
     }
   }
@@ -2946,7 +2979,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       s.lit = Math.abs(d) < (d > 0 ? rl : ll) * 0.95;
       drawShip(s, t);
     }
-    drawPier(t); drawIsland(); drawHornHouse(t); drawDishes(); drawHut(t); drawPathLamps(t); drawPillar(); drawTower(); drawClockwork(); drawCreature(t);
+    drawPier(t); drawIsland(); drawHarbor(t); drawHornHouse(t); drawDishes(); drawHut(t); drawPathLamps(t); drawPillar(); drawTower(); drawClockwork(); drawCreature(t);
     drawFog(t);
     drawBeam(1, rl); drawBeam(-1, ll);
     if (gs('clock') >= 5) {
