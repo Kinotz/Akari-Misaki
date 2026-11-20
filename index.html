@@ -3430,8 +3430,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     $('coachNext').addEventListener('click', function () { coachClose(true); renderAll(); });
     ['pointerdown', 'keydown'].forEach(function (n) { document.addEventListener(n, function () { lastInput = Date.now(); }, true); });
     // 目的のカード：「はじめる」で案内へ、「とばす」でカードだけ閉じる（案内は出る）
-    $('introGo').addEventListener('click', function () { closeIntro(); });
-    $('introSkip').addEventListener('click', function () { closeIntro(); });
+    $('introGo').addEventListener('click', function () { track('intro_start'); closeIntro(); });
+    $('introSkip').addEventListener('click', function () { track('intro_skip'); closeIntro(); });
     // 次の目標の行：押すと、最後の目標までの距離を1行で
     $('goal').addEventListener('click', routeToast);
     $('goal').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); routeToast(); } });
