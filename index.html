@@ -575,6 +575,23 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   var KEY = 'akari-no-misaki:v1';
 
+  // ---------- 遊ばれ方の計測（GA4） ----------
+  // 送るのはここ1か所だけ。gtag が無ければ（広告ブロック・オフラインなど）何もしない。
+  // 送る値は設備・強化・生き物の id や段の番号などの区分だけ。名前・入力・セーブの中身は送らない。
+  // 1回の読み込みで多くても TRACK_MAX 件、繰り返し押せるものは名前ごとに TRACK_LIMIT 件まで。
+  var TRACK_MAX = 60;
+  var TRACK_LIMIT = { boost_click: 10, boost_reward: 10, boost_close: 10, boost_fail: 5, sound_toggle: 6, menu_open: 10, game_reset: 3 };
+  var trackN = 0, trackSent = {};
+  function track(name, params) {
+    try {
+      if (typeof window.gtag !== 'function' || trackN >= TRACK_MAX) return;
+      var c = trackSent[name] || 0;
+      if (TRACK_LIMIT[name] && c >= TRACK_LIMIT[name]) return;
+      trackSent[name] = c + 1; trackN++;
+      window.gtag('event', name, params || {});
+    } catch (e) {}
+  }
+
   // 設備: 石油ランプから人工衛星管制局まで。cps は 1 台あたりの毎秒産出量。
   var GENS = [
     { id: 'lamp',      name: '石油ランプ',       desc: '芯を整えて火を灯す。',                   base: 15,          cps: 0.1 },
@@ -729,13 +746,19 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var e = typeof spec.el === 'function' ? spec.el() : $(spec.el);
     return e && e.offsetParent ? e : null;
   }
+  // はじめの案内の段を終えたとき（計測）。step は終えた段の番号（1から）。最後の段は tutorial_complete
+  function tutPassed(index) {
+    if (state.tut.replay) return;   // 「もう一度見る」は数えない
+    if (index + 1 >= TUT_CORE.length) track('tutorial_complete');
+    else track('tutorial_step', { step: index + 1 });
+  }
   function coachClose(markDone) {
     if (!coachNow) return;
     var c = coachNow;
     coachNow = null;
     $('coach').hidden = true;
     if (markDone) {
-      if (c.kind === 'core') state.tut.core = c.index + 1 >= TUT_CORE.length ? 99 : c.index + 1;
+      if (c.kind === 'core') { state.tut.core = c.index + 1 >= TUT_CORE.length ? 99 : c.index + 1; tutPassed(c.index); }
       else if (c.kind === 'ship') state.tut.ship = 1;
       else state.tut.seen[c.spec.id] = 1;
       save();
@@ -804,7 +827,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (t.core < 99) {
       var step = TUT_CORE[t.core];
       if (!step) { t.core = 99; return; }
-      if (!t.replay && step.done && step.done()) { t.core = t.core + 1 >= TUT_CORE.length ? 99 : t.core + 1; return; }
+      if (!t.replay && step.done && step.done()) { tutPassed(t.core); t.core = t.core + 1 >= TUT_CORE.length ? 99 : t.core + 1; return; }
       if (step.wait && !step.wait()) {
         if (t.replay) t.core = t.core + 1 >= TUT_CORE.length ? 99 : t.core + 1;   // もう一度見るときは、出せない段をとばす
         return;
@@ -1077,6 +1100,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   function buyGen(id) {
     var g = GMAP[id], p = plan(g);
     if (state.light < p.cost) return;
+    if (state.owned[id] === 0 && p.n > 0) track('gen_buy_first', { gen: id });
     state.light -= p.cost;
     state.owned[id] += p.n;
     pulse = Math.max(pulse, 0.6);
@@ -1088,6 +1112,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (state.ups[id] || state.light < u.cost) return;
     state.light -= u.cost;
     state.ups[id] = true;
+    track('upgrade_buy', { up: id });
     sfx('buy'); flashRow(upEls[id] && upEls[id].row); ringAt(UMAP[id].gen || 'mirror');
     renderAll(); save();
   }
@@ -1103,6 +1128,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var reward = Math.max(100, cps() * 45);
     gain(reward);
     state.guided++;
+    if ([1, 10, 50, 100].indexOf(state.guided) >= 0) track('ship_guided', { count: state.guided });
     showGain(reward);
     toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
     $('guide').hidden = true;
@@ -1112,7 +1138,11 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var sec = Math.min(dt, 28800);
     var g = cpsBase() * sec * 0.5;
     if (g > 0) gain(g);
-    if (sec >= 60 && g >= 1) showWelcome(g);
+    if (sec >= 60 && g >= 1) {
+      var h = dt / 3600;
+      track('welcome_back', { hours: h < 1 ? '0-1' : h < 3 ? '1-3' : h < 8 ? '3-8' : '8+' });
+      showWelcome(g);
+    }
   }
 
   // ---------- 追い風(報酬型広告) ----------
@@ -1185,6 +1215,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
   function rewardAdFailed() {
     if ($('adLayer').hidden) return;
+    track('boost_fail');
     adFailUntil = Date.now() + AD_RETRY_MS;
     closeAd(false);
     toast('広告を読み込めなかった。少しあとでまた', 3200, 2, 'adfail');
@@ -1217,7 +1248,13 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     $('rewardAdBody').innerHTML = '';
     var cb = adOnReward;
     adOnReward = null;
-    if (rewarded && cb) cb();
+    if (rewarded && cb) { track('boost_reward'); cb(); }
+  }
+  // 見る人が途中で閉じた（「やめる」・Esc）。読み込み失敗で閉じるときは boost_fail のほうで数える
+  function cancelAd() {
+    if ($('adLayer').hidden) return;
+    track('boost_close');
+    closeAd(false);
   }
   function renderBoost() {
     var b = $('boostBtn'), on = state.boostUntil - Date.now() > 0;
@@ -1424,6 +1461,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
   function setSound(key) {
     state.snd[key] = state.snd[key] ? 0 : 1;
+    track('sound_toggle', { kind: key === 'bgm' ? 'ambient' : 'sfx', on: state.snd[key] });
     audioReady();
     applySound(); save();
     if (key === 'sfx' && state.snd.sfx) sfx('buy');
@@ -1670,6 +1708,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     rangeNow = rangeOf(state.total);
     var ri = rankIdx(rangeNow);
     if (ri > state.rank) {
+      for (var lv = state.rank + 1; lv <= ri; lv++) track('level_up', { level: lv });
       state.rank = ri;
       rankFlash = 1; rankFx = 1;
       buzz([30, 60, 40]);
@@ -1856,6 +1895,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     gain(reward);
     showGain(reward);
     if (first) {
+      track('creature_meet', { kind: k.id });
       toast('図鑑に「' + k.name + '」。産出がずっと +5%', 4200, 3);
       buzz([20, 40, 20]); sfx('find', { kind: k.id, first: true });
     } else {
@@ -2727,14 +2767,15 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     });
     $('boostBtn').addEventListener('click', function () {
       if ($('boostBtn').getAttribute('aria-disabled') === 'true' || !adUsable()) return;
+      track('boost_click');
       showRewardedAd(startBoost);
     });
     window.addEventListener('online', function () { renderAll(); });
     window.addEventListener('offline', function () { renderAll(); });
     $('adGo').addEventListener('click', function () { closeAd(true); });
-    $('adCancel').addEventListener('click', function () { closeAd(false); });
+    $('adCancel').addEventListener('click', cancelAd);
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !$('adLayer').hidden) closeAd(false);
+      if (e.key === 'Escape' && !$('adLayer').hidden) cancelAd();
     });
 
     var tg = $('tabGen'), tu = $('tabUp'), qtyEl = $('qty');
@@ -2758,6 +2799,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     $('coachSkip').addEventListener('click', function () {
       // とばす：はじめの流れならまとめて終わりに、一言ならそれだけ閉じる
       if (!coachNow) return;
+      if (coachNow.kind === 'core' && !state.tut.replay) track('tutorial_skip', { step: coachNow.index + 1 });
       if (coachNow.kind === 'core') { state.tut.core = 99; state.tut.replay = 0; coachNow = null; $('coach').hidden = true; save(); }
       else coachClose(true);
     });
@@ -2772,8 +2814,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     function openMenu(open) {
       menuPage.hidden = !open;
       menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) { renderAll(); $('menuClose').focus(); } else { menuBtn.focus(); }
+      if (open) { track('menu_open', { page: 'menu' }); renderAll(); $('menuClose').focus(); } else { menuBtn.focus(); }
     }
+    $('privacyLink').addEventListener('click', function () { track('menu_open', { page: 'privacy' }); });
     menuBtn.addEventListener('click', function () { openMenu(menuPage.hidden); });
     $('menuClose').addEventListener('click', function () { openMenu(false); });
     document.addEventListener('keydown', function (e) {
@@ -2788,10 +2831,12 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     $('resetNo').addEventListener('click', function () { $('resetAsk').hidden = true; $('resetBtn').hidden = false; });
     $('resetYes').addEventListener('click', function () {
       try { localStorage.removeItem(KEY); } catch (e) {}
+      track('game_reset');
       state = fresh(); upSig = null; theta = 0; nextBonus = 10;
       seedShips(); renderAll();
       $('resetAsk').hidden = true; $('resetBtn').hidden = false;
       toast('最初から始めます', 2600, 2);
+      track('tutorial_begin');
       applySound();
       openMenu(false);
     });
@@ -2825,6 +2870,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       var dt = (Date.now() - state.seen) / 1000;
       if (dt > 10) away(dt);
     }
+    if (!loaded) track('tutorial_begin');   // セーブが無く、新しく始めたとき
     renderAll();
     applySound();
     requestAnimationFrame(frame);
