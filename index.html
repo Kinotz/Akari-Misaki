@@ -168,7 +168,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   min-height: 52px; border-bottom: 2px dotted var(--rule);
 }
 .row-main {
-  display: flex; align-items: baseline; gap: 8px; min-height: 48px; min-width: 0; padding: 0;
+  display: flex; align-items: center; gap: 8px; min-height: 48px; min-width: 0; padding: 0;
   background: none; border: 0; text-align: left; color: var(--ink-b); cursor: pointer;
 }
 .row-main .name { font: 700 16px/1.35 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -256,7 +256,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 /* 光の数のそばに出る「+N」 */
 .bank { position: relative; }
 .gain {
-  position: absolute; left: 0; top: -6px; font-size: 16px; font-weight: 700; opacity: 0; pointer-events: none;
+  position: absolute; right: 4px; top: 2px; font-size: 16px; font-weight: 700; opacity: 0; pointer-events: none;
 }
 .gain.show { animation: gainUp 0.9s ease-out forwards; }
 @keyframes gainUp { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
@@ -528,6 +528,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   var creature = null, nextCreature = 35 + Math.random() * 35;
   // 景色の成長: 灯台の高さ(格に合わせて伸びる)、格上げの光、霧、衛星
   var towerGrow = 0, rankFlash = 0;
+  // 手触り：磨くと光線が一瞬伸び（beamKick）、灯りから光の粒（sparks）が舞う
+  var beamKick = 0, sparks = [];
   var fog = 0, fogTarget = 0, fogTimer = 70 + Math.random() * 60, fogLeft = 0;
   var satT = Math.random() * 60;
 
@@ -754,6 +756,14 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     gain(p);
     state.taps++;
     pulse = 1;
+    beamKick = Math.min(1, beamKick + 0.4);
+    if (!reduce) {
+      for (var i = 0; i < 3; i++) {
+        var a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, sp = 30 + Math.random() * 40;
+        sparks.push({ x: lampX, y: lampY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, age: 0, life: 0.6 + Math.random() * 0.3, r: 1.4 + Math.random() * 1.4 });
+      }
+      if (sparks.length > 60) sparks.splice(0, sparks.length - 60);
+    }
     showGain(p);
     sfx('tap');
     renderAll();
@@ -2140,6 +2150,16 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       ctx.fill(); ctx.stroke();
     }
   }
+  function drawSparks() {
+    // 灯りから舞う光の粒（刷った小さな丸）
+    for (var i = 0; i < sparks.length; i++) {
+      var sk = sparks[i], a = 1 - sk.age / sk.life;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.fillStyle = '#FFF4D6';
+      ctx.beginPath(); ctx.arc(sk.x, sk.y, sk.r, 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
   function draw(t) {
     if (!W) return;
     ctx.clearRect(0, 0, W, H);
@@ -2148,7 +2168,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     drawSky(t, ph); drawSatellite(t); drawSea(t, ph); drawTurbines(t);
     var c = Math.cos(theta);
     var frac = Math.max(0, Math.min(1, (rangeNow - 3) / 19));
-    var len = W * (0.28 + 0.62 * frac);
+    var len = W * (0.28 + 0.62 * frac) * (1 + 0.35 * beamKick);
     var rl = len * Math.pow(Math.max(0, c), 1.4), ll = len * Math.pow(Math.max(0, -c), 1.4);
     for (var i = 0; i < ships.length; i++) {
       var s = ships[i], d = s.x - lampX;
@@ -2157,7 +2177,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     }
     drawPier(t); drawIsland(); drawHut(t); drawTower(); drawCreature(t);
     drawFog(t);
-    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c));
+    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks();
     ctx.globalCompositeOperation = 'lighter';
     drawRankFlash();
     ctx.globalCompositeOperation = 'source-over';
@@ -2172,6 +2192,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     if (c > 0 && dt > 0) gain(c * dt);
     theta += ((reduce ? 0.35 : 0.9) + 0.08 * Math.sqrt(state.owned.clock || 0)) * dt;
     pulse = Math.max(0, pulse - dt * 3);
+    beamKick = Math.max(0, beamKick - dt * 2.2);
+    for (var si = sparks.length - 1; si >= 0; si--) {
+      var sk = sparks[si];
+      sk.age += dt; sk.x += sk.vx * dt; sk.y += sk.vy * dt; sk.vy += 40 * dt;
+      if (sk.age > sk.life) sparks.splice(si, 1);
+    }
     dayT += dt;
     var ph2 = dayBlend();
     var golden = goldenActive();
