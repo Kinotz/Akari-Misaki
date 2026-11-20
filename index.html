@@ -544,7 +544,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
         <h3 id="achTitle">灯台日誌</h3>
         <p class="lead num" id="achSum">40件のうち0件</p>
         <ul class="ach-list" id="achList"></ul>
-        <p class="note">岬での出来事を書きとめる日誌です。1件記すごとに、光の産出がずっと +1% になります。</p>
+        <p class="note">岬での出来事を書きとめる日誌です。1件記すごとに、光の産出がずっと +1% になります（日誌の頁の強化で、1件あたりの伸びが増えます）。</p>
       </section>
       <section aria-labelledby="lgTitle">
         <h3 id="lgTitle">岬の言い伝え</h3>
@@ -727,6 +727,11 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'flag',      name: '信号旗',           desc: '金の船が少し早く来るようになる。',         cost: 300000,       ship: 'gap',   x: 1.15, guided: 10 },
     { id: 'pilot',     name: '水先案内人',       desc: '積み荷の船の光が1.5倍。',                  cost: 100000000,    ship: 'cargo', x: 1.5,  guided: 25 },
     { id: 'radio',     name: '無線電信',         desc: '灯祭り・鏡職人の効き目が1.5倍長く続く。',  cost: 10000000000,  ship: 'long',  x: 1.5,  guided: 50 },
+    // 日誌の頁：灯台日誌が achs 件になると見える。1つごとに「日誌1件につき+1%」がもう1段
+    { id: 'diary1',    name: '新しい日誌帳',     desc: '日誌1件につき、産出がもう +1%。',          cost: 500000,           page: 1, achs: 10 },
+    { id: 'diary2',    name: '日誌の写し',       desc: '日誌1件につき、産出がもう +1%。',          cost: 30000000000,      page: 1, achs: 20 },
+    { id: 'diary3',    name: '日誌の製本',       desc: '日誌1件につき、産出がもう +1%。',          cost: 3000000000000,    page: 1, achs: 30 },
+    { id: 'diary4',    name: '代々の日誌',       desc: '日誌1件につき、産出がもう +1%。',          cost: 500000000000000,  page: 1, achs: 40 },
     { id: 'air',       name: '澄んだ夜気',       desc: 'すべての産出が1.25倍。',                    cost: 100000,       all: 1.25 },
     { id: 'calm',      name: '凪の季節',         desc: 'すべての産出が1.5倍。',                     cost: 5000000,      all: 1.5 },
     { id: 'spring',    name: '大潮',             desc: 'すべての産出が1.75倍。',                    cost: 80000000,     all: 1.75 },
@@ -1216,7 +1221,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var AMAP = {};
   ACHS.forEach(function (a) { AMAP[a.id] = a; });
   function achCount() { var n = 0; ACHS.forEach(function (a) { if (state.ach[a.id]) n++; }); return n; }
-  function achMult() { return 1 + ACH_X * achCount(); }
+  function achPages() { var n = 0; UPS.forEach(function (u) { if (u.page && state.ups[u.id]) n++; }); return n; }
+  function achMult() { return 1 + ACH_X * achCount() * (1 + achPages()); }
   function lifeTotal() { return state.total; }   // 集めた光の合計を読む所はここだけ（のちに周をまたいだ合計へ差し替えられる）
   function achDone(a, c) {
     switch (a.k) {
@@ -1249,8 +1255,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     achNews([AMAP[id]]);
   }
   function achNews(got) {
-    if (got.length === 1) toast('日誌に記した：' + got[0].name + '（産出+1%）', 3200, 2, 'ach');
-    else toast('日誌に ' + got.length + '件 記した（産出+' + got.length + '%）', 3200, 2, 'ach');
+    var per = 1 + achPages();   // 日誌の頁を買うと、1件あたりの伸びが増える
+    if (got.length === 1) toast('日誌に記した：' + got[0].name + '（産出+' + per + '%）', 3200, 2, 'ach');
+    else toast('日誌に ' + got.length + '件 記した（産出+' + got.length * per + '%）', 3200, 2, 'ach');
     sfx('page');
   }
 
@@ -1886,7 +1893,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   function visibleUps() {
     return UPS.filter(function (u) {
-      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] >= (u.need || 1)) && (!u.guided || state.guided >= u.guided);
+      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] >= (u.need || 1)) && (!u.guided || state.guided >= u.guided) && (!u.achs || achCount() >= u.achs);
     }).sort(function (a, b) { return a.cost - b.cost; });
   }
   // 強化タブは最初の強化が見えたとき、まとめ買いは設備を合計10個持ったときに出す（一度出たら出したまま）
@@ -2003,7 +2010,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var achSig = '';
   function renderAch() {
     if ($('menuPage').hidden && achSig) return;   // 一覧はメニューを開いているときだけ書き直す
-    var sig = ACHS.map(function (a) { return state.ach[a.id] ? 1 : 0; }).join('');
+    var sig = ACHS.map(function (a) { return state.ach[a.id] ? 1 : 0; }).join('') + ':' + achPages();
     if (sig === achSig) return;
     achSig = sig;
     var n = achCount();
