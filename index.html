@@ -141,19 +141,17 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 .dot { display: inline-block; width: 9px; height: 9px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
-/* 追い風(広告ブースト) */
+/* 追い風(広告ブースト)：青緑のボタン。広告が使えるときだけ出す。吹いている間は同じ場所で残り時間を見せる */
 .boost {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 12px; border: 2.5px solid var(--ink-b);
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 52px; padding: 0 12px;
+  background: var(--teal); color: var(--on); border: 0; border-radius: 0; box-shadow: 3px 2px 0 var(--ink-b);
+  text-align: left; cursor: pointer;
 }
-.boost-text { display: flex; flex-direction: column; min-width: 0; }
-.boost-text b { font: 700 16px/1.4 var(--font-display); }
-.boost-text span { font-size: 13px; font-variant-numeric: tabular-nums; }
-.boost-btn {
-  flex: none; min-height: 48px; padding: 0 14px; border-radius: 0; cursor: pointer; border: 0;
-  background: var(--teal); color: var(--on); font-weight: 700; font-size: 15px;
-}
-.boost-btn:disabled { opacity: 1; cursor: default; }
+.boost svg { flex: none; }
+.boost b { font-weight: 700; font-size: 16px; white-space: nowrap; }
+.boost span { flex: 1; font-size: 15px; white-space: nowrap; }
+.boost em { font-style: normal; font-weight: 700; font-size: 13px; line-height: 20px; padding: 0 5px; border: 2px solid var(--on); white-space: nowrap; }
+.boost.on { box-shadow: none; cursor: default; }
 
 /* 設備・強化 */
 .shop { display: flex; flex-direction: column; }
@@ -365,13 +363,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
     <p class="hint" id="hint">灯りか塔をタップして光を集めよう。金色に光る船が通ったら、タップして岬へ導こう。</p>
 
-    <section class="boost" id="boost" aria-label="追い風" hidden>
-      <div class="boost-text">
-        <b id="boostTitle">追い風を呼ぶ</b>
-        <span id="boostSub">広告を見ると、3分間 光が2倍になります。</span>
-      </div>
-      <button class="boost-btn" id="boostBtn" type="button">広告を見る</button>
-    </section>
+    <button class="boost" id="boostBtn" type="button" hidden>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 9h11a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 19h7"/></svg>
+      <b id="boostTitle">追い風を呼ぶ</b><span id="boostSub" class="num">3分間 光×2</span><em id="boostTag">広告</em>
+    </button>
 
     <section class="shop" aria-label="岬の備え">
       <div class="tabs" id="tabs" role="tablist">
@@ -767,7 +762,22 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   // リワード広告(広告を見て光2倍)を使うときだけ true にする。
   var REWARDED_ADS = true;
   var BOOST_MS = 3 * 60 * 1000, AD_SECONDS = 15;
-  var adTimer = 0, adOnReward = null;
+  var adTimer = 0, adOnReward = null, adCheckTimer = 0;
+  // 広告が使えるか：手帳のバナー広告が実際に描画されたら使える。読み込みに失敗したら5分は出さない。
+  var AD_CHECK_MS = 8000, AD_RETRY_MS = 5 * 60 * 1000;
+  var adReady = false, adFailUntil = 0;
+  function watchBannerAd() {
+    var slot = $('adSlot');
+    if (!slot) return;
+    function check() {
+      if (adReady) return;
+      // 広告タグが書き込んだ要素（iframe・画像・リンクなど）があれば、広告は届いている
+      if (slot.querySelector('iframe, img, a, ins, div, video, canvas')) { adReady = true; renderAll(); }
+    }
+    check();
+    if (window.MutationObserver) new MutationObserver(check).observe(slot, { childList: true, subtree: true });
+  }
+  function adUsable() { return adReady && navigator.onLine !== false && Date.now() >= adFailUntil; }
   // 忍者AdMaxの広告タグ(この「広告を見る」ボタン専用、300x250で作成)。広告を見るたびに読み込み直す。
   var REWARD_AD_TAG_SRC = 'https://adm.shinobi.jp/s/ed16ad69ab02a6f748812ab596479a7b';
 
@@ -803,6 +813,23 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       '</head><body><script src="' + REWARD_AD_TAG_SRC + '"><' + '/script></body></html>'
     );
     doc.close();
+    // 読み込みに失敗したら（タグの取得エラー、または時間内に広告が出てこない）、報酬なしで閉じる
+    var tag = doc.querySelector('script');
+    if (tag) tag.addEventListener('error', function () { rewardAdFailed(); });
+    clearTimeout(adCheckTimer);
+    adCheckTimer = setTimeout(function () {
+      var d = null;
+      try { d = iframe.contentWindow && iframe.contentWindow.document; } catch (e) { d = null; }
+      // 別の場所から広告が差し込まれて中が読めない場合は、出ているものとして扱う
+      if (d && d.body && !d.body.querySelector('iframe, img, a, ins, div, video, canvas')) rewardAdFailed();
+    }, AD_CHECK_MS);
+  }
+  function rewardAdFailed() {
+    if ($('adLayer').hidden) return;
+    adFailUntil = Date.now() + AD_RETRY_MS;
+    closeAd(false);
+    toast('広告を読み込めませんでした。少しあとでもう一度どうぞ。', 3600);
+    renderAll();
   }
 
   // 広告を見終わる(＝待ち終わる)と onReward() を呼ぶ。広告そのもののクリックは求めない。
@@ -826,7 +853,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     }, 100);
   }
   function closeAd(rewarded) {
-    clearInterval(adTimer);
+    clearInterval(adTimer); clearTimeout(adCheckTimer);
     $('adLayer').hidden = true;
     $('rewardAdBody').innerHTML = '';
     var cb = adOnReward;
@@ -834,21 +861,24 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     if (rewarded && cb) cb();
   }
   function renderBoost() {
-    var box = $('boost'), on = state.boostUntil - Date.now() > 0;
-    var show = REWARDED_ADS && (state.total >= 50 || on);
-    box.hidden = !show;
+    var b = $('boostBtn'), on = state.boostUntil - Date.now() > 0;
+    // 吹いている間は見せ続ける。呼ぶボタンは、累計50光を超え、広告が使えるときだけ
+    var show = REWARDED_ADS && (on || (state.total >= 50 && adUsable()));
+    b.hidden = !show;
     if (!show) return;
-    box.dataset.on = on ? 'true' : 'false';
-    $('boostTitle').textContent = on ? '追い風 光2倍' : '追い風を呼ぶ';
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-disabled', on ? 'true' : 'false');
     if (on) {
       var s = Math.ceil((state.boostUntil - Date.now()) / 1000);
+      $('boostTitle').textContent = '追い風が吹いている';
       $('boostSub').textContent = '残り ' + Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+      $('boostTag').textContent = '光×2';
     } else {
-      $('boostSub').textContent = '広告を見ると、3分間 光が2倍になります。';
+      $('boostTitle').textContent = '追い風を呼ぶ';
+      $('boostSub').textContent = '3分間 光×2';
+      $('boostTag').textContent = '広告';
     }
-    var b = $('boostBtn');
-    b.disabled = on;
-    b.textContent = on ? '適用中' : '広告を見る';
+    b.setAttribute('aria-label', on ? '追い風が吹いている。' + $('boostSub').textContent : '広告を見て追い風を呼ぶ（3分間 光が2倍）');
   }
 
   // ---------- BGM(ローファイ、すべてその場で合成) ----------
@@ -2171,7 +2201,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       var ri = rankIdx(rangeNow);
       toast(RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
     });
-    $('boostBtn').addEventListener('click', function () { showRewardedAd(startBoost); });
+    $('boostBtn').addEventListener('click', function () {
+      if ($('boostBtn').getAttribute('aria-disabled') === 'true' || !adUsable()) return;
+      showRewardedAd(startBoost);
+    });
+    window.addEventListener('online', function () { renderAll(); });
+    window.addEventListener('offline', function () { renderAll(); });
     $('adGo').addEventListener('click', function () { closeAd(true); });
     $('adCancel').addEventListener('click', function () { closeAd(false); });
     document.addEventListener('keydown', function (e) {
@@ -2233,6 +2268,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     state = loaded || fresh();
     buildGens();
     bind();
+    watchBannerAd();
     resize();
     if (!W) { W = 400; H = 600; VH = 300; horizon = VH * 0.6; lampX = W * 0.5; lampY = VH * 0.29; }
     rangeNow = rangeOf(state.total);
