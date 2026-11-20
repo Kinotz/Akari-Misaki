@@ -668,10 +668,40 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       default: return { x: lampX, y: lampY };   // 反射鏡・回転機構・フレネルレンズは灯室
     }
   }
-  function ringAt(id) {
+  // 増えた1つの場所（灯・風車・桟橋の灯は何本目か。ほかは設備の場所）
+  function spotOf(id, idx) {
+    if (idx != null) {
+      if (id === 'lamp') { var fx = PATH_LAMP_X[idx]; return { x: W * fx, y: islandTopY(fx) - 11 }; }
+      if (id === 'wind') return { x: W * TURBINE_X[idx], y: horizon + 1 - VH * 0.075 };
+      if (id === 'plant') { var c = shownCount('plant'), f = (idx + 0.5) / c; return { x: W * 0.76 + (W * 0.28 - W * 0.04) * f, y: VH * 0.93 - 13 - f * 2 }; }
+    }
+    return equipSpot(id);
+  }
+  function ringAt(id, idx) {
     if (reduce) return;
-    var p = equipSpot(id);
+    var p = spotOf(id, idx);
     buyRings.push({ x: p.x, y: p.y, age: 0 });
+  }
+  // 買った瞬間：増えた1つ（idx）か、その設備の飾り全体（idx=null）が、その場所で跳ねる
+  var pops = {};
+  function popStart(id, idx) { if (!reduce) pops[id] = { age: 0, idx: idx }; }
+  function popTick(dt) { for (var k in pops) { pops[k].age += dt; if (pops[k].age > 0.6) delete pops[k]; } }
+  function popK(id, idx) {
+    var p = pops[id];
+    if (!p || (p.idx != null && p.idx !== idx)) return 1;
+    var k = p.age / 0.45;
+    if (k >= 1) return 1;
+    return k < 0.45 ? 0.6 + 0.55 * (k / 0.45) : 1.15 - 0.15 * ((k - 0.45) / 0.55);
+  }
+  function popAround(id, idx, x, y) { var s = popK(id, idx); if (s !== 1) { ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-x, -y); } }
+  // 景色に出ている数（数で増える設備だけ）
+  function shownCount(id) {
+    var n = state ? state.owned[id] : 0;
+    if (n < 1) return 0;
+    if (id === 'lamp') return Math.min(6, 1 + Math.floor(Math.log(n) / Math.log(2)));
+    if (id === 'wind') return Math.min(5, 1 + Math.floor(Math.log(n) / Math.log(2)));
+    if (id === 'plant') return Math.min(6, 2 + Math.floor(Math.log(1 + n) / Math.log(2)));
+    return 1;
   }
   var fog = 0, fogTarget = 0, fogTimer = 70 + Math.random() * 60, fogLeft = 0;
   var satT = Math.random() * 60;
@@ -1101,10 +1131,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var g = GMAP[id], p = plan(g);
     if (state.light < p.cost) return;
     if (state.owned[id] === 0 && p.n > 0) track('gen_buy_first', { gen: id });
+    var shown0 = shownCount(id);
     state.light -= p.cost;
     state.owned[id] += p.n;
     pulse = Math.max(pulse, 0.6);
-    sfx('buy', { tier: GENS.indexOf(g) }); flashRow(genEls[id] && genEls[id].row); ringAt(id);
+    // 増えた1つがあればそれを、なければその設備の飾りを跳ねさせ、そこに刷った輪
+    var newIdx = shownCount(id) > shown0 && (id === 'lamp' || id === 'wind' || id === 'plant') ? shownCount(id) - 1 : null;
+    popStart(id, newIdx);
+    sfx('buy', { tier: GENS.indexOf(g) }); flashRow(genEls[id] && genEls[id].row); ringAt(id, newIdx);
     renderAll(); save();
   }
   function buyUp(id) {
@@ -2207,6 +2241,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var ph = dayBlend();
     var fx = 0.355, x = W * fx, y = islandTopY(fx) + 3;
     var hw = W * 0.075, hh = VH * 0.05;
+    ctx.save(); popAround('keeper', null, x, y);
     ctx.fillStyle = pc('tower', ph);
     ctx.fillRect(x - hw / 2, y - hh, hw, hh);
     ctx.fillStyle = pc('band', ph);
@@ -2220,6 +2255,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.beginPath(); ctx.arc(x - hw * 0.28 + ww / 2, y - hh * 0.7 + wh / 2, hw * 0.4, 0, 6.283); ctx.fill();
       ctx.globalAlpha = 1;
     }
+    ctx.restore();
   }
 
   var PATH_LAMP_X = [0.25, 0.68, 0.3, 0.73, 0.21, 0.63];
@@ -2230,6 +2266,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var n = nightness();
     for (var i = 0; i < count; i++) {
       var fx = PATH_LAMP_X[i], x = W * fx, y = islandTopY(fx) + 2;
+      ctx.save(); popAround('lamp', i, x, y);
       if (n > 0.3) {
         ctx.globalAlpha = 0.22 * n * (reduce ? 1 : 0.85 + 0.15 * Math.sin(t * 2.6 + i * 1.7));
         ctx.fillStyle = '#F2C14E';
@@ -2240,6 +2277,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#E8D7A8';
       ctx.fillRect(x - 2.5, y - 16, 5, 6);
       ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 16, 5, 6);
+      ctx.restore();
     }
   }
   function drawPier(t) {
@@ -2247,6 +2285,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (!state || state.owned.plant < 1) return;
     var ph = dayBlend();
     var y0 = VH * 0.93, x0 = W * 0.76, x1 = W * 1.04;
+    ctx.save(); popAround('plant', null, x0, y0);
     ctx.fillStyle = pc('isle', ph);
     ctx.beginPath();
     ctx.moveTo(x0, y0 - 3); ctx.lineTo(x1, y0 - 5); ctx.lineTo(x1, y0 + 4); ctx.lineTo(x0, y0 + 6); ctx.closePath(); ctx.fill();
@@ -2257,9 +2296,12 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.fillStyle = pc('isle', ph); ctx.fillRect(lx - 0.7, ly - 8, 1.4, 8);
       ctx.globalAlpha = n * (0.75 + (reduce ? 0 : 0.25 * Math.sin(t * 2 + i)));
       ctx.fillStyle = '#F3E6C4';
+      ctx.save(); popAround('plant', i, lx, ly);
       ctx.beginPath(); ctx.arc(lx, ly - 9, 2.2, 0, 6.283); ctx.fill();
+      ctx.restore();
       ctx.globalAlpha = 1;
     }
+    ctx.restore();
   }
 
   var TURBINE_X = [0.86, 0.1, 0.94, 0.19, 0.78];
@@ -2271,6 +2313,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var col = n > 0.5 ? '#F3E6C4' : '#FBF6EA';
     for (var i = 0; i < count; i++) {
       var x = W * TURBINE_X[i], base = horizon + 1, hubY = base - h;
+      ctx.save(); popAround('wind', i, x, base);
       ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, hubY); ctx.stroke();
       var ang = (reduce ? 0.6 : t * (0.9 + i * 0.07)) + i * 1.3;
@@ -2283,6 +2326,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.globalAlpha = blink; ctx.fillStyle = '#E2643F';
       ctx.beginPath(); ctx.arc(x, hubY - 1, 1.8, 0, 6.283); ctx.fill();
       ctx.globalAlpha = 1;
+      ctx.restore();
     }
   }
 
@@ -2622,17 +2666,19 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     }
     ctx.globalAlpha = 1;
   }
-  function drawBuyRings() {
-    for (var i = 0; i < buyRings.length; i++) {
-      var r = buyRings[i], k = r.age / 0.8, rad = 8 + 34 * k;
-      ctx.globalAlpha = (1 - k) * 0.35; ctx.fillStyle = '#FFF4D6';
-      ctx.beginPath(); ctx.arc(r.x, r.y, rad * 0.7, 0, 6.283); ctx.fill();
-      ctx.globalAlpha = 1 - k; ctx.lineWidth = 3; ctx.strokeStyle = '#F2C14E';
-      ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, 6.283); ctx.stroke();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = '#33261F';
-      ctx.beginPath(); ctx.arc(r.x + 2, r.y + 1.5, rad, 0, 6.283); ctx.stroke();
-    }
+  // 刷った輪：版画の細い線の輪を1組（墨の線と、少しずれた版ずれの色）。0.55秒で広がって消える
+  var RING_SEC = 0.55;
+  function printRing(x, y, k, r0, r1) {
+    var e = 1 - Math.pow(1 - k, 3), rad = r0 + (r1 - r0) * e, ph = dayBlend();
+    ctx.globalAlpha = 1 - k;
+    ctx.lineWidth = 1.5; ctx.strokeStyle = nightness() > 0.5 ? '#F3E6C4' : '#33261F';
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.283); ctx.stroke();
+    ctx.lineWidth = 1; ctx.strokeStyle = pc('band', ph);
+    ctx.beginPath(); ctx.arc(x + 1.5, y + 1, rad, 0, 6.283); ctx.stroke();
     ctx.globalAlpha = 1;
+  }
+  function drawBuyRings() {
+    for (var i = 0; i < buyRings.length; i++) printRing(buyRings[i].x, buyRings[i].y, Math.min(1, buyRings[i].age / RING_SEC), 5, 24);
   }
   function drawSparks() {
     // 灯りから舞う光の粒（刷った小さな丸）
@@ -2678,13 +2724,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     pulse = Math.max(0, pulse - dt * 3);
     beamKick = Math.max(0, beamKick - dt * 2.2);
     rankFx = Math.max(0, rankFx - dt / 3.2);
+    popTick(dt);
     for (var pi = ripples.length - 1; pi >= 0; pi--) {
       ripples[pi].age += dt;
       if (ripples[pi].age > 0.9) ripples.splice(pi, 1);
     }
     for (var bi = buyRings.length - 1; bi >= 0; bi--) {
       buyRings[bi].age += dt;
-      if (buyRings[bi].age > 0.8) buyRings.splice(bi, 1);
+      if (buyRings[bi].age > RING_SEC) buyRings.splice(bi, 1);
     }
     for (var si = sparks.length - 1; si >= 0; si--) {
       var sk = sparks[si];
