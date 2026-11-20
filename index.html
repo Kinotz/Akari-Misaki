@@ -19,6 +19,20 @@
 <meta name="twitter:title" content="灯りの岬">
 <meta name="twitter:description" content="灯台の灯りを磨いて光を集め、岬を大きく育てる放置ゲーム。">
 <meta name="twitter:image" content="https://kinotz.github.io/Akari-Misaki/ogimage.png">
+<!-- アクセス解析（GA4）。gtm.js は使わず gtag.js を直接読み込む。読み込めなくてもゲームはそのまま動く -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H34R0HVN9S"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  gtag('js', new Date());
+  (function () {
+    // Googleシグナルと広告のパーソナライズは使わない（通信先を googletagmanager.com と google-analytics.com に留める）
+    var o = { allow_google_signals: false, allow_ad_personalization_signals: false };
+    // ?debug=1 のときだけ DebugView に出す（debug_mode は false でも有効になるので、付けないことで切る）
+    if (/[?&]debug=1(&|$)/.test(location.search)) o.debug_mode = true;
+    gtag('config', 'G-H34R0HVN9S', o);
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&display=swap">
