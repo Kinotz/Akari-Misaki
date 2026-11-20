@@ -503,7 +503,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     <section class="shop" aria-label="岬の備え">
       <div class="tabs" id="tabs" role="tablist">
         <button class="tab" id="tabGen" role="tab" aria-selected="true" aria-controls="genList" type="button">設備</button>
-        <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/54</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
+        <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/61</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
         <div class="qty" id="qty" role="group" aria-label="まとめ買い">
           <button type="button" data-q="1" aria-pressed="true">×1</button>
           <button type="button" data-q="10" aria-pressed="false">×10</button>
@@ -665,9 +665,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'clock',     name: '回転機構',         desc: '時計仕掛けの重りでレンズが回る。',       base: 12000,       cps: 47 },
     { id: 'fresnel',   name: 'フレネルレンズ',   desc: '同心円のプリズムが光を束ねる。',         base: 130000,      cps: 260 },
     { id: 'horn',      name: '霧笛',             desc: '霧の夜も船に岬の位置を知らせる。',       base: 1400000,     cps: 1400 },
-    { id: 'plant',     name: '潮力発電所',       desc: '岬の潮流から電気を起こす。',             base: 15000000,    cps: 7800 },
-    { id: 'wind',      name: '洋上風力発電',     desc: '沖に並ぶ風車群が夜どおし電気を送る。',   base: 160000000,   cps: 43000 },
-    { id: 'satellite', name: '人工衛星管制局',   desc: '軌道上の衛星が航路を見守り、灯台の役目を引き継ぐ。', base: 1700000000, cps: 240000 }
+    { id: 'plant',     name: '潮力発電所',       desc: '岬の潮流から電気を起こす。',             base: 22500000,    cps: 7800 },
+    { id: 'wind',      name: '洋上風力発電',     desc: '沖に並ぶ風車群が夜どおし電気を送る。',   base: 400000000,   cps: 43000 },
+    { id: 'satellite', name: '人工衛星管制局',   desc: '軌道上の衛星が航路を見守り、灯台の役目を引き継ぐ。', base: 6800000000, cps: 240000 }
   ];
 
   // 強化: tap=磨く力の倍率, share=磨くたび毎秒産出の割合を加算, gen=設備の倍率（need=その設備を何台持つと見えるか。無ければ1）, all=全体の倍率
@@ -688,50 +688,50 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     // 段階強化：その設備を need 台持つと見える（景色の節目 10・25・50・100 と同じ）。1つにつき、その設備の産出が2倍
     { id: 'tide',      name: '潮見表',           desc: '潮力発電所の産出が2倍。',                   cost: 180000000,    gen: 'plant' },
     { id: 'lamp10', name: '芯切りばさみ', desc: '石油ランプの産出が2倍。', cost: 750, gen: 'lamp', need: 10 },
-    { id: 'lamp25', name: '二重の火屋', desc: '石油ランプの産出が2倍。', cost: 9000, gen: 'lamp', need: 25 },
-    { id: 'lamp50', name: '真鍮の笠', desc: '石油ランプの産出が2倍。', cost: 300000, gen: 'lamp', need: 50 },
+    { id: 'lamp25', name: '二重の火屋', desc: '石油ランプの産出が2倍。', cost: 4500, gen: 'lamp', need: 25 },
+    { id: 'lamp50', name: '真鍮の笠', desc: '石油ランプの産出が2倍。', cost: 150000, gen: 'lamp', need: 50 },
     { id: 'lamp100', name: '精製した灯油', desc: '石油ランプの産出が2倍。', cost: 45000000, gen: 'lamp', need: 100 },
     { id: 'mirror10', name: '曲面の研ぎ出し', desc: '反射鏡の産出が2倍。', cost: 5000, gen: 'mirror', need: 10 },
-    { id: 'mirror25', name: '継ぎ目のない銀鏡', desc: '反射鏡の産出が2倍。', cost: 60000, gen: 'mirror', need: 25 },
-    { id: 'mirror50', name: '角度の目盛り', desc: '反射鏡の産出が2倍。', cost: 2000000, gen: 'mirror', need: 50 },
+    { id: 'mirror25', name: '継ぎ目のない銀鏡', desc: '反射鏡の産出が2倍。', cost: 30000, gen: 'mirror', need: 25 },
+    { id: 'mirror50', name: '角度の目盛り', desc: '反射鏡の産出が2倍。', cost: 1000000, gen: 'mirror', need: 50 },
     { id: 'mirror100', name: '星を映す鏡', desc: '反射鏡の産出が2倍。', cost: 300000000, gen: 'mirror', need: 100 },
     { id: 'keeper10', name: '夜番の交代表', desc: '見習い灯台守の産出が2倍。', cost: 35000, gen: 'keeper', need: 10 },
-    { id: 'keeper25', name: '灯台守の寮', desc: '見習い灯台守の産出が2倍。', cost: 420000, gen: 'keeper', need: 25 },
-    { id: 'keeper50', name: '見習いの免状', desc: '見習い灯台守の産出が2倍。', cost: 14000000, gen: 'keeper', need: 50 },
+    { id: 'keeper25', name: '灯台守の寮', desc: '見習い灯台守の産出が2倍。', cost: 210000, gen: 'keeper', need: 25 },
+    { id: 'keeper50', name: '見習いの免状', desc: '見習い灯台守の産出が2倍。', cost: 7000000, gen: 'keeper', need: 50 },
     { id: 'keeper100', name: '灯台守の家系', desc: '見習い灯台守の産出が2倍。', cost: 2100000000, gen: 'keeper', need: 100 },
     { id: 'clock10', name: '油差しの習慣', desc: '回転機構の産出が2倍。', cost: 600000, gen: 'clock', need: 10 },
-    { id: 'clock25', name: '真鍮の重り', desc: '回転機構の産出が2倍。', cost: 7200000, gen: 'clock', need: 25 },
-    { id: 'clock50', name: '振り子の調速機', desc: '回転機構の産出が2倍。', cost: 240000000, gen: 'clock', need: 50 },
+    { id: 'clock25', name: '真鍮の重り', desc: '回転機構の産出が2倍。', cost: 3600000, gen: 'clock', need: 25 },
+    { id: 'clock50', name: '振り子の調速機', desc: '回転機構の産出が2倍。', cost: 120000000, gen: 'clock', need: 50 },
     { id: 'clock100', name: '止まらないぜんまい', desc: '回転機構の産出が2倍。', cost: 36000000000, gen: 'clock', need: 100 },
     { id: 'fresnel10', name: '二段目のプリズム', desc: 'フレネルレンズの産出が2倍。', cost: 6500000, gen: 'fresnel', need: 10 },
-    { id: 'fresnel25', name: '色ガラスの縁', desc: 'フレネルレンズの産出が2倍。', cost: 78000000, gen: 'fresnel', need: 25 },
-    { id: 'fresnel50', name: '水銀槽の台座', desc: 'フレネルレンズの産出が2倍。', cost: 2600000000, gen: 'fresnel', need: 50 },
+    { id: 'fresnel25', name: '色ガラスの縁', desc: 'フレネルレンズの産出が2倍。', cost: 39000000, gen: 'fresnel', need: 25 },
+    { id: 'fresnel50', name: '水銀槽の台座', desc: 'フレネルレンズの産出が2倍。', cost: 1300000000, gen: 'fresnel', need: 50 },
     { id: 'fresnel100', name: '光の稜線', desc: 'フレネルレンズの産出が2倍。', cost: 390000000000, gen: 'fresnel', need: 100 },
     { id: 'horn10', name: '霧笛の調律', desc: '霧笛の産出が2倍。', cost: 70000000, gen: 'horn', need: 10 },
-    { id: 'horn25', name: '二連の圧縮機', desc: '霧笛の産出が2倍。', cost: 840000000, gen: 'horn', need: 25 },
-    { id: 'horn50', name: '遠鳴りの喇叭', desc: '霧笛の産出が2倍。', cost: 28000000000, gen: 'horn', need: 50 },
+    { id: 'horn25', name: '二連の圧縮機', desc: '霧笛の産出が2倍。', cost: 420000000, gen: 'horn', need: 25 },
+    { id: 'horn50', name: '遠鳴りの喇叭', desc: '霧笛の産出が2倍。', cost: 14000000000, gen: 'horn', need: 50 },
     { id: 'horn100', name: '海鳴りと合わせる', desc: '霧笛の産出が2倍。', cost: 4200000000000, gen: 'horn', need: 100 },
     { id: 'plant10', name: '防波堤の補強', desc: '潮力発電所の産出が2倍。', cost: 750000000, gen: 'plant', need: 10 },
-    { id: 'plant25', name: '夜潮の取水口', desc: '潮力発電所の産出が2倍。', cost: 9000000000, gen: 'plant', need: 25 },
-    { id: 'plant50', name: '大潮の送電線', desc: '潮力発電所の産出が2倍。', cost: 300000000000, gen: 'plant', need: 50 },
+    { id: 'plant25', name: '夜潮の取水口', desc: '潮力発電所の産出が2倍。', cost: 4500000000, gen: 'plant', need: 25 },
+    { id: 'plant50', name: '大潮の送電線', desc: '潮力発電所の産出が2倍。', cost: 150000000000, gen: 'plant', need: 50 },
     { id: 'plant100', name: '潮汐の帳面', desc: '潮力発電所の産出が2倍。', cost: 45000000000000, gen: 'plant', need: 100 },
     { id: 'wind10', name: '羽根の角度合わせ', desc: '洋上風力発電の産出が2倍。', cost: 8000000000, gen: 'wind', need: 10 },
-    { id: 'wind25', name: '沖の変電所', desc: '洋上風力発電の産出が2倍。', cost: 96000000000, gen: 'wind', need: 25 },
-    { id: 'wind50', name: '季節風の暦', desc: '洋上風力発電の産出が2倍。', cost: 3200000000000, gen: 'wind', need: 50 },
+    { id: 'wind25', name: '沖の変電所', desc: '洋上風力発電の産出が2倍。', cost: 48000000000, gen: 'wind', need: 25 },
+    { id: 'wind50', name: '季節風の暦', desc: '洋上風力発電の産出が2倍。', cost: 1600000000000, gen: 'wind', need: 50 },
     { id: 'wind100', name: '風の地図', desc: '洋上風力発電の産出が2倍。', cost: 480000000000000, gen: 'wind', need: 100 },
     { id: 'satellite10', name: '軌道の微調整', desc: '人工衛星管制局の産出が2倍。', cost: 85000000000, gen: 'satellite', need: 10 },
-    { id: 'satellite25', name: '二基目の受信盤', desc: '人工衛星管制局の産出が2倍。', cost: 1000000000000, gen: 'satellite', need: 25 },
-    { id: 'satellite50', name: '夜空の中継網', desc: '人工衛星管制局の産出が2倍。', cost: 34000000000000, gen: 'satellite', need: 50 },
+    { id: 'satellite25', name: '二基目の受信盤', desc: '人工衛星管制局の産出が2倍。', cost: 500000000000, gen: 'satellite', need: 25 },
+    { id: 'satellite50', name: '夜空の中継網', desc: '人工衛星管制局の産出が2倍。', cost: 17000000000000, gen: 'satellite', need: 50 },
     { id: 'satellite100', name: '星座のような衛星群', desc: '人工衛星管制局の産出が2倍。', cost: 5100000000000000, gen: 'satellite', need: 100 },
     // 船の強化：導いた金の船が guided 隻になると見える。ship=gap（間隔を x 分の1に）/ cargo（積み荷の光を x 倍）/ long（灯祭り・鏡職人を x 倍長く）
     { id: 'flag',      name: '信号旗',           desc: '金の船が少し早く来るようになる。',         cost: 300000,       ship: 'gap',   x: 1.15, guided: 10 },
     { id: 'pilot',     name: '水先案内人',       desc: '積み荷の船の光が1.5倍。',                  cost: 100000000,    ship: 'cargo', x: 1.5,  guided: 25 },
     { id: 'radio',     name: '無線電信',         desc: '灯祭り・鏡職人の効き目が1.5倍長く続く。',  cost: 10000000000,  ship: 'long',  x: 1.5,  guided: 50 },
     // 日誌の頁：灯台日誌が achs 件になると見える。1つごとに「日誌1件につき+1%」がもう1段
-    { id: 'diary1',    name: '新しい日誌帳',     desc: '日誌1件につき、産出がもう +1%。',          cost: 500000,           page: 1, achs: 10 },
-    { id: 'diary2',    name: '日誌の写し',       desc: '日誌1件につき、産出がもう +1%。',          cost: 30000000000,      page: 1, achs: 20 },
-    { id: 'diary3',    name: '日誌の製本',       desc: '日誌1件につき、産出がもう +1%。',          cost: 3000000000000,    page: 1, achs: 30 },
-    { id: 'diary4',    name: '代々の日誌',       desc: '日誌1件につき、産出がもう +1%。',          cost: 500000000000000,  page: 1, achs: 40 },
+    { id: 'diary1',    name: '新しい日誌帳',     desc: '日誌1件につき、産出がもう +1%。',          cost: 500000, page: 1, achs: 10 },
+    { id: 'diary2',    name: '日誌の写し',       desc: '日誌1件につき、産出がもう +1%。',          cost: 300000000000, page: 1, achs: 20 },
+    { id: 'diary3',    name: '日誌の製本',       desc: '日誌1件につき、産出がもう +1%。',          cost: 30000000000000, page: 1, achs: 30 },
+    { id: 'diary4',    name: '代々の日誌',       desc: '日誌1件につき、産出がもう +1%。',          cost: 5000000000000000, page: 1, achs: 40 },
     { id: 'air',       name: '澄んだ夜気',       desc: 'すべての産出が1.25倍。',                    cost: 100000,       all: 1.25 },
     { id: 'calm',      name: '凪の季節',         desc: 'すべての産出が1.5倍。',                     cost: 5000000,      all: 1.5 },
     { id: 'spring',    name: '大潮',             desc: 'すべての産出が1.75倍。',                    cost: 80000000,     all: 1.75 },
