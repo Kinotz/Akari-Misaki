@@ -242,11 +242,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 .linkbtn.danger { background: var(--nano); border: 2.5px solid var(--ink-b); text-decoration: none; padding: 0 12px; }
 
-/* 広告枠 */
-.adslot { display: flex; flex-direction: column; gap: 6px; }
+/* 広告枠：買い物リストの末尾。ボタンと間違えないよう、上に余白と区切り線、「広告」の表示 */
+.adslot { display: flex; flex-direction: column; gap: 6px; margin-top: 24px; padding-top: 10px; border-top: 2.5px solid var(--ink-b); }
 .adslot-tag { font-size: 13px; font-weight: 700; }
 .adslot-body { display: flex; justify-content: center; align-items: center; min-height: 50px; max-width: 100%; overflow: hidden; }
-.adslot-dummy { display: grid; place-items: center; width: 320px; max-width: 100%; height: 50px; border: 2px dashed var(--ink-b); font-size: 13px; }
 
 /* お知らせ(手帳の中、ドックのすぐ上に出る) */
 .toast {
@@ -382,7 +381,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       <div class="list" id="upList" role="tabpanel" aria-labelledby="tabUp" hidden></div>
     </section>
 
-    <aside class="adslot" aria-label="広告">
+    <aside class="adslot" id="adBox" aria-label="広告">
       <span class="adslot-tag">広告</span>
       <div class="adslot-body" id="adSlot">
         <!-- 広告タグの貼り付け場所: AD_TAG_START と AD_TAG_END の間を、広告サービスのタグに置き換えてください -->
@@ -772,10 +771,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     function check() {
       if (adReady) return;
       // 広告タグが書き込んだ要素（iframe・画像・リンクなど）があれば、広告は届いている
-      if (slot.querySelector('iframe, img, a, ins, div, video, canvas')) { adReady = true; renderAll(); }
+      if (slot.querySelector('iframe, img, a, ins, div, video, canvas')) { adReady = true; $('adBox').hidden = false; renderAll(); }
     }
     check();
     if (window.MutationObserver) new MutationObserver(check).observe(slot, { childList: true, subtree: true });
+    // しばらく待っても何も届かなければ、空の枠は畳む（タグはそのまま残す）
+    setTimeout(function () { if (!adReady) $('adBox').hidden = true; }, 10000);
   }
   function adUsable() { return adReady && navigator.onLine !== false && Date.now() >= adFailUntil; }
   // 忍者AdMaxの広告タグ(この「広告を見る」ボタン専用、300x250で作成)。広告を見るたびに読み込み直す。
