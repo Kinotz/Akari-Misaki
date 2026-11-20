@@ -662,9 +662,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       case 'lamp': return { x: W * 0.25, y: islandTopY(0.25) - 8 };
       case 'keeper': return { x: W * 0.355, y: islandTopY(0.355) - VH * 0.04 };
       case 'horn': return { x: lampX + W * 0.05, y: VH * 0.32 + off };
+      case 'clock': return { x: lampX + W * 0.05, y: VH * 0.385 + off };
       case 'plant': return { x: W * 0.88, y: VH * 0.92 };
       case 'wind': return { x: W * 0.86, y: horizon - VH * 0.06 };
-      case 'satellite': return { x: W * 0.5, y: horizon * 0.22 };
+      case 'satellite': return satSpot || { x: W * 0.5, y: horizon * 0.22 };
       default: return { x: lampX, y: lampY };   // 反射鏡・回転機構・フレネルレンズは灯室
     }
   }
@@ -2331,17 +2332,32 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
 
   function drawSatellite(t) {
-    // 人工衛星管制局: 夜空をゆっくり横切る衛星の光
+    // 人工衛星管制局: 空をゆっくり渡る衛星（昼は本体とパネル、夜は灯が点滅）
     if (!state || state.owned.satellite < 1) return;
     var n = nightness();
-    if (n < 0.25) return;
     var period = 46, k = (satT % period) / period;
     if (k > 0.8) return; // 少し間をあけて次が来る
-    var p = k / 0.8, x = -10 + (W + 20) * p, y = horizon * (0.22 - 0.1 * Math.sin(p * Math.PI));
-    var blink = reduce ? 0.8 : (Math.sin(t * 6) > 0 ? 1 : 0.4);
-    ctx.globalCompositeOperation = 'lighter';
-    lightDot(x, y, 1, '220,240,255', 0.8 * n * blink);
-    ctx.globalCompositeOperation = 'source-over';
+    var p = reduce ? 0.62 : k / 0.8, x = -10 + (W + 20) * p, y = horizon * (0.22 - 0.1 * Math.sin(p * Math.PI));
+    satSpot = { x: x, y: y };
+    ctx.save(); popAround('satellite', null, x, y);
+    drawSatBody(x, y, 1 - n * 0.6);
+    ctx.restore();
+    if (n >= 0.25) {
+      var blink = reduce ? 0.8 : (Math.sin(t * 6) > 0 ? 1 : 0.4);
+      ctx.globalCompositeOperation = 'lighter';
+      lightDot(x, y, 1, '220,240,255', 0.8 * n * blink);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+  var satSpot = null;
+  function drawSatBody(x, y, a) {
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#2D6A99'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 0.8;
+    ctx.fillRect(x - 8.5, y - 1.5, 5, 3); ctx.strokeRect(x - 8.5, y - 1.5, 5, 3);
+    ctx.fillRect(x + 3.5, y - 1.5, 5, 3); ctx.strokeRect(x + 3.5, y - 1.5, 5, 3);
+    ctx.fillStyle = '#FBF1DC'; ctx.fillRect(x - 2.5, y - 2.5, 5, 5); ctx.strokeRect(x - 2.5, y - 2.5, 5, 5);
+    ctx.fillStyle = '#33261F'; ctx.fillRect(x - 3.5, y - 0.4, 7, 0.8);
+    ctx.globalAlpha = 1;
   }
   function drawFog(t) {
     // 霧笛: ときどき海に霧が流れてくる（淡い紙色の帯）
@@ -2570,6 +2586,30 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     }
   }
 
+  // 回転機構：灯室の窓の中を、光線の向きに合わせて明るい縞が横切る（レンズ板が回る）。塔の右に真鍮の歯車
+  function gear(x, y, r, a, teeth) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var i = 0; i < teeth * 2; i++) { var rr = i % 2 ? r : r * 1.28, an = i * Math.PI / teeth; ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#33261F'; ctx.beginPath(); ctx.arc(0, 0, r * 0.32, 0, 6.283); ctx.fill();
+    ctx.restore();
+  }
+  function drawClockwork() {
+    if (!state || state.owned.clock < 1) return;
+    var off = towerOff(), lw = W * 0.027 * (towerGrow >= 4 ? 1.12 : 1), ltop = VH * 0.255 + off, lh = VH * 0.07;
+    ctx.save(); ctx.beginPath(); ctx.rect(lampX - lw, ltop, lw * 2, lh); ctx.clip();
+    var sx = lampX + Math.sin(theta) * lw * 0.9;
+    ctx.fillStyle = 'rgba(255,250,232,0.85)'; ctx.fillRect(sx - 2, ltop, 4, lh);
+    ctx.fillStyle = 'rgba(51,38,31,0.35)'; ctx.fillRect(sx + 2, ltop, 1.2, lh);
+    ctx.restore();
+    var sp = equipSpot('clock');
+    ctx.save(); popAround('clock', null, sp.x, sp.y);
+    gear(sp.x, sp.y, 4, theta, 8);
+    ctx.restore();
+  }
+
   function drawBeam(dir, len) {
     if (len < 2) return;
     var n = nightness();
@@ -2705,7 +2745,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       s.lit = Math.abs(d) < (d > 0 ? rl : ll) * 0.95;
       drawShip(s, t);
     }
-    drawPier(t); drawIsland(); drawHut(t); drawPathLamps(t); drawTower(); drawCreature(t);
+    drawPier(t); drawIsland(); drawHut(t); drawPathLamps(t); drawTower(); drawClockwork(); drawCreature(t);
     drawFog(t);
     drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples(); drawRankFx();
     ctx.globalCompositeOperation = 'lighter';
