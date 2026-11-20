@@ -148,6 +148,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .bank strong { font: 700 34px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .bank .cps { margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
 .bank .cps em { font-style: normal; font-weight: 700; margin-left: 6px; }
+.bank .cps em small { font-size: 0.8em; font-weight: 400; margin-left: 2px; }
 
 /* 次の目標（1行） */
 .goal {
@@ -276,6 +277,14 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .zukan-list .znote { display: block; font-size: 13px; line-height: 1.5; }
 .zukan-list .zcount { font-size: 15px; font-variant-numeric: tabular-nums; }
 .legend-text { margin: 0; font-size: 15px; line-height: 1.8; }
+/* 灯台日誌：2列の帳面。記した頁は黒丸、まだの頁は白丸（格の点と同じ作り） */
+.ach-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 14px; border-top: 2px dotted var(--rule); }
+.ach-list li { position: relative; padding: 7px 0 7px 16px; border-bottom: 2px dotted var(--rule); min-width: 0; }
+.ach-list li::before { content: ""; position: absolute; left: 0; top: 12px; width: 7px; height: 7px; border: 2px solid var(--ink-b); border-radius: 50%; }
+.ach-list li.got::before { background: var(--ink-b); }
+.ach-list .aname { display: block; font: 400 14px/1.35 var(--font-display); overflow-wrap: anywhere; }
+.ach-list li.got .aname { font-weight: 700; }
+.ach-list .anote { display: block; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 12px; margin: 0; }
 .stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stats dt { font-size: 13px; }
@@ -494,7 +503,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     <section class="shop" aria-label="岬の備え">
       <div class="tabs" id="tabs" role="tablist">
         <button class="tab" id="tabGen" role="tab" aria-selected="true" aria-controls="genList" type="button">設備</button>
-        <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/17</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
+        <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/61</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
         <div class="qty" id="qty" role="group" aria-label="まとめ買い">
           <button type="button" data-q="1" aria-pressed="true">×1</button>
           <button type="button" data-q="10" aria-pressed="false">×10</button>
@@ -530,6 +539,12 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
         <p class="lead num" id="zukanSum">4種のうち0種</p>
         <ul class="zukan-list" id="zukanList"></ul>
         <p class="note">岬のどこかに、ときどき生き物が顔を出します。初めて出会うたびに、光の産出がずっと +5% になります。</p>
+      </section>
+      <section aria-labelledby="achTitle">
+        <h3 id="achTitle">灯台日誌</h3>
+        <p class="lead num" id="achSum">40件のうち0件</p>
+        <ul class="ach-list" id="achList"></ul>
+        <p class="note">岬での出来事を書きとめる日誌です。1件記すごとに、光の産出がずっと +1% になります（日誌の頁の強化で、1件あたりの伸びが増えます）。</p>
       </section>
       <section aria-labelledby="lgTitle">
         <h3 id="lgTitle">岬の言い伝え</h3>
@@ -630,7 +645,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   // 送る値は設備・強化・生き物の id や段の番号などの区分だけ。名前・入力・セーブの中身は送らない。
   // 1回の読み込みで多くても TRACK_MAX 件、繰り返し押せるものは名前ごとに TRACK_LIMIT 件まで。
   var TRACK_MAX = 60;
-  var TRACK_LIMIT = { boost_click: 10, boost_reward: 10, boost_close: 10, boost_fail: 5, sound_toggle: 6, menu_open: 10, game_reset: 3 };
+  var TRACK_LIMIT = { boost_click: 10, boost_reward: 10, boost_close: 10, boost_fail: 5, sound_toggle: 6, menu_open: 10, game_reset: 3, ship_kind: 9, ach_get: 20, ach_backfill: 1 };
   var trackN = 0, trackSent = {};
   function track(name, params) {
     try {
@@ -644,18 +659,18 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   // 設備: 石油ランプから人工衛星管制局まで。cps は 1 台あたりの毎秒産出量。
   var GENS = [
-    { id: 'lamp',      name: '石油ランプ',       desc: '芯を整えて火を灯す。',                   base: 15,          cps: 0.1 },
+    { id: 'lamp',      name: '石油ランプ',       desc: '芯を整えて火を灯す。',                   base: 15,          cps: 0.25 },
     { id: 'mirror',    name: '反射鏡',           desc: '銀引きの鏡で光を一方向に集める。',       base: 100,         cps: 1 },
     { id: 'keeper',    name: '見習い灯台守',     desc: '夜通しレンズを拭いてくれる。',           base: 700,         cps: 8 },
     { id: 'clock',     name: '回転機構',         desc: '時計仕掛けの重りでレンズが回る。',       base: 12000,       cps: 47 },
     { id: 'fresnel',   name: 'フレネルレンズ',   desc: '同心円のプリズムが光を束ねる。',         base: 130000,      cps: 260 },
     { id: 'horn',      name: '霧笛',             desc: '霧の夜も船に岬の位置を知らせる。',       base: 1400000,     cps: 1400 },
-    { id: 'plant',     name: '潮力発電所',       desc: '岬の潮流から電気を起こす。',             base: 15000000,    cps: 7800 },
-    { id: 'wind',      name: '洋上風力発電',     desc: '沖に並ぶ風車群が夜どおし電気を送る。',   base: 160000000,   cps: 43000 },
-    { id: 'satellite', name: '人工衛星管制局',   desc: '軌道上の衛星が航路を見守り、灯台の役目を引き継ぐ。', base: 1700000000, cps: 240000 }
+    { id: 'plant',     name: '潮力発電所',       desc: '岬の潮流から電気を起こす。',             base: 22500000,    cps: 7800 },
+    { id: 'wind',      name: '洋上風力発電',     desc: '沖に並ぶ風車群が夜どおし電気を送る。',   base: 400000000,   cps: 43000 },
+    { id: 'satellite', name: '人工衛星管制局',   desc: '軌道上の衛星が航路を見守り、灯台の役目を引き継ぐ。', base: 6800000000, cps: 240000 }
   ];
 
-  // 強化: tap=磨く力の倍率, share=磨くたび毎秒産出の割合を加算, gen=設備の倍率, all=全体の倍率
+  // 強化: tap=磨く力の倍率, share=磨くたび毎秒産出の割合を加算, gen=設備の倍率（need=その設備を何台持つと見えるか。無ければ1）, all=全体の倍率
   var UPS = [
     { id: 'cloth',     name: '柔らかい磨き布',   desc: '磨く力が2倍になる。',                       cost: 100,          tap: 2 },
     { id: 'chamois',   name: '鹿革のクロス',     desc: '磨く力がさらに2倍。',                       cost: 1000,         tap: 2 },
@@ -670,6 +685,53 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'amp',       name: '低音の増幅管',     desc: '霧笛の産出が2倍。',                         cost: 15000000,     gen: 'horn' },
     { id: 'windtech',  name: '風車の整備',       desc: '洋上風力発電の産出が2倍。',                 cost: 1800000000,   gen: 'wind' },
     { id: 'satcal',    name: '管制室の較正',     desc: '人工衛星管制局の産出が2倍。',               cost: 19000000000,  gen: 'satellite' },
+    // 段階強化：その設備を need 台持つと見える（景色の節目 10・25・50・100 と同じ）。1つにつき、その設備の産出が2倍
+    { id: 'tide',      name: '潮見表',           desc: '潮力発電所の産出が2倍。',                   cost: 180000000,    gen: 'plant' },
+    { id: 'lamp10', name: '芯切りばさみ', desc: '石油ランプの産出が2倍。', cost: 750, gen: 'lamp', need: 10 },
+    { id: 'lamp25', name: '二重の火屋', desc: '石油ランプの産出が2倍。', cost: 4500, gen: 'lamp', need: 25 },
+    { id: 'lamp50', name: '真鍮の笠', desc: '石油ランプの産出が2倍。', cost: 150000, gen: 'lamp', need: 50 },
+    { id: 'lamp100', name: '精製した灯油', desc: '石油ランプの産出が2倍。', cost: 45000000, gen: 'lamp', need: 100 },
+    { id: 'mirror10', name: '曲面の研ぎ出し', desc: '反射鏡の産出が2倍。', cost: 5000, gen: 'mirror', need: 10 },
+    { id: 'mirror25', name: '継ぎ目のない銀鏡', desc: '反射鏡の産出が2倍。', cost: 30000, gen: 'mirror', need: 25 },
+    { id: 'mirror50', name: '角度の目盛り', desc: '反射鏡の産出が2倍。', cost: 1000000, gen: 'mirror', need: 50 },
+    { id: 'mirror100', name: '星を映す鏡', desc: '反射鏡の産出が2倍。', cost: 300000000, gen: 'mirror', need: 100 },
+    { id: 'keeper10', name: '夜番の交代表', desc: '見習い灯台守の産出が2倍。', cost: 35000, gen: 'keeper', need: 10 },
+    { id: 'keeper25', name: '灯台守の寮', desc: '見習い灯台守の産出が2倍。', cost: 210000, gen: 'keeper', need: 25 },
+    { id: 'keeper50', name: '見習いの免状', desc: '見習い灯台守の産出が2倍。', cost: 7000000, gen: 'keeper', need: 50 },
+    { id: 'keeper100', name: '灯台守の家系', desc: '見習い灯台守の産出が2倍。', cost: 2100000000, gen: 'keeper', need: 100 },
+    { id: 'clock10', name: '油差しの習慣', desc: '回転機構の産出が2倍。', cost: 600000, gen: 'clock', need: 10 },
+    { id: 'clock25', name: '真鍮の重り', desc: '回転機構の産出が2倍。', cost: 3600000, gen: 'clock', need: 25 },
+    { id: 'clock50', name: '振り子の調速機', desc: '回転機構の産出が2倍。', cost: 120000000, gen: 'clock', need: 50 },
+    { id: 'clock100', name: '止まらないぜんまい', desc: '回転機構の産出が2倍。', cost: 36000000000, gen: 'clock', need: 100 },
+    { id: 'fresnel10', name: '二段目のプリズム', desc: 'フレネルレンズの産出が2倍。', cost: 6500000, gen: 'fresnel', need: 10 },
+    { id: 'fresnel25', name: '色ガラスの縁', desc: 'フレネルレンズの産出が2倍。', cost: 39000000, gen: 'fresnel', need: 25 },
+    { id: 'fresnel50', name: '水銀槽の台座', desc: 'フレネルレンズの産出が2倍。', cost: 1300000000, gen: 'fresnel', need: 50 },
+    { id: 'fresnel100', name: '光の稜線', desc: 'フレネルレンズの産出が2倍。', cost: 390000000000, gen: 'fresnel', need: 100 },
+    { id: 'horn10', name: '霧笛の調律', desc: '霧笛の産出が2倍。', cost: 70000000, gen: 'horn', need: 10 },
+    { id: 'horn25', name: '二連の圧縮機', desc: '霧笛の産出が2倍。', cost: 420000000, gen: 'horn', need: 25 },
+    { id: 'horn50', name: '遠鳴りの喇叭', desc: '霧笛の産出が2倍。', cost: 14000000000, gen: 'horn', need: 50 },
+    { id: 'horn100', name: '海鳴りと合わせる', desc: '霧笛の産出が2倍。', cost: 4200000000000, gen: 'horn', need: 100 },
+    { id: 'plant10', name: '防波堤の補強', desc: '潮力発電所の産出が2倍。', cost: 750000000, gen: 'plant', need: 10 },
+    { id: 'plant25', name: '夜潮の取水口', desc: '潮力発電所の産出が2倍。', cost: 4500000000, gen: 'plant', need: 25 },
+    { id: 'plant50', name: '大潮の送電線', desc: '潮力発電所の産出が2倍。', cost: 150000000000, gen: 'plant', need: 50 },
+    { id: 'plant100', name: '潮汐の帳面', desc: '潮力発電所の産出が2倍。', cost: 45000000000000, gen: 'plant', need: 100 },
+    { id: 'wind10', name: '羽根の角度合わせ', desc: '洋上風力発電の産出が2倍。', cost: 8000000000, gen: 'wind', need: 10 },
+    { id: 'wind25', name: '沖の変電所', desc: '洋上風力発電の産出が2倍。', cost: 48000000000, gen: 'wind', need: 25 },
+    { id: 'wind50', name: '季節風の暦', desc: '洋上風力発電の産出が2倍。', cost: 1600000000000, gen: 'wind', need: 50 },
+    { id: 'wind100', name: '風の地図', desc: '洋上風力発電の産出が2倍。', cost: 480000000000000, gen: 'wind', need: 100 },
+    { id: 'satellite10', name: '軌道の微調整', desc: '人工衛星管制局の産出が2倍。', cost: 85000000000, gen: 'satellite', need: 10 },
+    { id: 'satellite25', name: '二基目の受信盤', desc: '人工衛星管制局の産出が2倍。', cost: 500000000000, gen: 'satellite', need: 25 },
+    { id: 'satellite50', name: '夜空の中継網', desc: '人工衛星管制局の産出が2倍。', cost: 17000000000000, gen: 'satellite', need: 50 },
+    { id: 'satellite100', name: '星座のような衛星群', desc: '人工衛星管制局の産出が2倍。', cost: 5100000000000000, gen: 'satellite', need: 100 },
+    // 船の強化：導いた金の船が guided 隻になると見える。ship=gap（間隔を x 分の1に）/ cargo（積み荷の光を x 倍）/ long（灯祭り・鏡職人を x 倍長く）
+    { id: 'flag',      name: '信号旗',           desc: '金の船が少し早く来るようになる。',         cost: 300000,       ship: 'gap',   x: 1.15, guided: 10 },
+    { id: 'pilot',     name: '水先案内人',       desc: '積み荷の船の光が1.5倍。',                  cost: 100000000,    ship: 'cargo', x: 1.5,  guided: 25 },
+    { id: 'radio',     name: '無線電信',         desc: '灯祭り・鏡職人の効き目が1.5倍長く続く。',  cost: 10000000000,  ship: 'long',  x: 1.5,  guided: 50 },
+    // 日誌の頁：灯台日誌が achs 件になると見える。1つごとに「日誌1件につき+1%」がもう1段
+    { id: 'diary1',    name: '新しい日誌帳',     desc: '日誌1件につき、産出がもう +1%。',          cost: 500000, page: 1, achs: 10 },
+    { id: 'diary2',    name: '日誌の写し',       desc: '日誌1件につき、産出がもう +1%。',          cost: 300000000000, page: 1, achs: 20 },
+    { id: 'diary3',    name: '日誌の製本',       desc: '日誌1件につき、産出がもう +1%。',          cost: 30000000000000, page: 1, achs: 30 },
+    { id: 'diary4',    name: '代々の日誌',       desc: '日誌1件につき、産出がもう +1%。',          cost: 5000000000000000, page: 1, achs: 40 },
     { id: 'air',       name: '澄んだ夜気',       desc: 'すべての産出が1.25倍。',                    cost: 100000,       all: 1.25 },
     { id: 'calm',      name: '凪の季節',         desc: 'すべての産出が1.5倍。',                     cost: 5000000,      all: 1.5 },
     { id: 'spring',    name: '大潮',             desc: 'すべての産出が1.75倍。',                    cost: 80000000,     all: 1.75 },
@@ -852,7 +914,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'qty', when: function () { return state.ui.qty && !$('qty').hidden; }, el: 'qty', text: 'まとめて買える（×10・最大）', auto: 5000 },
     { id: 'boost', when: function () { return !$('boostBtn').hidden && !(state.boostUntil > Date.now()); }, el: 'boostBtn', text: '広告を見ると、3分間 光×2', auto: 5000 },
     { id: 'golden', when: function () { return goldenActive(); }, el: 'cps', text: '凪の恵み：しばらく光×1.5', auto: 5000 },
-    { id: 'fog', when: function () { return fog > 0.3; }, el: null, text: '霧笛が鳴った。霧の中の船に岬を知らせる', auto: 5000 }
+    { id: 'fog', when: function () { return fog > 0.3; }, el: null, text: '霧笛が鳴った。霧のあいだは金の船が来やすい', auto: 5000 }
   ];
   // はじめの案内を最後まで終えたその場で一度だけ、物差しの右端の灯台を指す（保存しない）
   var TUT_GOAL = { id: 'goal', el: 'goalRoute', text: '右端の灯台が、最後の目標（22海里）', auto: 6000 };
@@ -1043,7 +1105,12 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       // tut: はじめの案内の段(core。99で終わり)、金の船の案内(ship)、初めて出る要素の一言を見たか(seen)
       tut: { core: 0, ship: 0, seen: {} },
       // snd: 環境音(bgm)と効果音(sfx)。はじめは効果音だけ鳴らす
-      snd: { bgm: 0, sfx: 1 } };
+      snd: { bgm: 0, sfx: 1 },
+      // buff: 金の船がくれた効果の終わる時刻（ミリ秒）。shipN: 種類ごとに導いた数
+      buff: { fest: 0, mirror: 0 }, shipN: { cargo: 0, fest: 0, mirror: 0 },
+      // ach: 灯台日誌に記した頁（id→1）
+      ach: {} };
+      // 周をまたいで残す物（のちの「灯を継ぐ」用）：met・ach・shipN・guided・taps。周で戻る物：light・total・owned・ups・rank・buff
   }
   function sanitize(s) {
     if (!s || typeof s !== 'object') return null;
@@ -1069,6 +1136,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (s.snd.bgm === 1) b.snd.bgm = 1;
       if (s.snd.sfx === 0) b.snd.sfx = 0;
     }
+    if (s.ach && typeof s.ach === 'object') ACHS.forEach(function (a) { if (s.ach[a.id] === 1) b.ach[a.id] = 1; });
+    ['buff', 'shipN'].forEach(function (key) {
+      if (!s[key] || typeof s[key] !== 'object') return;
+      Object.keys(b[key]).forEach(function (k) {
+        var n = s[key][k];
+        if (typeof n === 'number' && isFinite(n) && n >= 0) b[key][k] = key === 'shipN' ? Math.floor(n) : n;
+      });
+    });
     if (s.tut && typeof s.tut === 'object') {
       if (typeof s.tut.core === 'number' && isFinite(s.tut.core)) b.tut.core = Math.max(0, Math.min(99, Math.floor(s.tut.core)));
       if (s.tut.ship === 1) b.tut.ship = 1;
@@ -1097,6 +1172,95 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     try { state.seen = Date.now(); localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
   }
 
+  // ---------- 灯台日誌（実績） ----------
+  // k で何を数えるかを決める（判定は achDone の1か所）。hide=まだ記していない間は名前も条件も伏せる。
+  // 'ev' は出来事（その場で achEvent で記す。あとから数で確かめられない）
+  var ACHS = [
+    { id: 't3',  name: '千の光',         note: '光を合計 1,000 集める',   k: 'total', n: 1e3 },
+    { id: 't5',  name: '灯りの手ざわり', note: '光を合計 10万 集める',    k: 'total', n: 1e5 },
+    { id: 't7',  name: '海図に載る光',   note: '光を合計 1000万 集める',  k: 'total', n: 1e7 },
+    { id: 't9',  name: '十億の灯',       note: '光を合計 10億 集める',    k: 'total', n: 1e9 },
+    { id: 't11', name: '夜の向こうまで', note: '光を合計 1000億 集める',  k: 'total', n: 1e11 },
+    { id: 't13', name: '星に届く光',     note: '光を合計 10兆 集める',    k: 'total', n: 1e13 },
+    { id: 'c1',  name: 'ひとりでに灯る', note: '毎秒 10 の光',            k: 'cps', n: 10 },
+    { id: 'c3',  name: '夜どおしの灯',   note: '毎秒 1,000 の光',         k: 'cps', n: 1e3 },
+    { id: 'c5',  name: '岬の明るい夜',   note: '毎秒 10万 の光',          k: 'cps', n: 1e5 },
+    { id: 'c7',  name: '昼のような夜',   note: '毎秒 1000万 の光',        k: 'cps', n: 1e7 },
+    { id: 'p2',  name: '布を手に',       note: '100回 磨く',              k: 'taps', n: 100 },
+    { id: 'p3',  name: '磨き癖',         note: '1,000回 磨く',            k: 'taps', n: 1000 },
+    { id: 'p4',  name: '曇りひとつない', note: '5,000回 磨く',            k: 'taps', n: 5000 },
+    { id: 'p5',  name: '鏡のような手',   note: '20,000回 磨く',           k: 'taps', n: 20000 },
+    { id: 'g1',  name: '最初の一隻',     note: '金の船を1隻 導く',        k: 'guided', n: 1 },
+    { id: 'g10', name: '港のなじみ',     note: '金の船を10隻 導く',       k: 'guided', n: 10 },
+    { id: 'g50', name: '航路の番人',     note: '金の船を50隻 導く',       k: 'guided', n: 50 },
+    { id: 'g150', name: '海の道しるべ',  note: '金の船を150隻 導く',      k: 'guided', n: 150 },
+    { id: 'sf',  name: '灯祭りの夜',     note: '灯祭りの船を導く',        k: 'ship', kind: 'fest', n: 1 },
+    { id: 'sm',  name: '鏡職人の来訪',   note: '鏡職人の船を導く',        k: 'ship', kind: 'mirror', n: 1 },
+    { id: 'olamp',      name: '灯りの並木道',   note: '石油ランプを50台',       k: 'own', gen: 'lamp', n: 50 },
+    { id: 'omirror',    name: '鏡の回廊',       note: '反射鏡を50台',           k: 'own', gen: 'mirror', n: 50 },
+    { id: 'okeeper',    name: 'にぎやかな宿舎', note: '見習い灯台守を50人',     k: 'own', gen: 'keeper', n: 50 },
+    { id: 'oclock',     name: '歯車の音',       note: '回転機構を50台',         k: 'own', gen: 'clock', n: 50 },
+    { id: 'ofresnel',   name: 'プリズムの森',   note: 'フレネルレンズを50枚',   k: 'own', gen: 'fresnel', n: 50 },
+    { id: 'ohorn',      name: '霧笛の合唱',     note: '霧笛を50台',             k: 'own', gen: 'horn', n: 50 },
+    { id: 'oplant',     name: '潮の発電所',     note: '潮力発電所を50か所',     k: 'own', gen: 'plant', n: 50 },
+    { id: 'owind',      name: '風車の海',       note: '洋上風力発電を50基',     k: 'own', gen: 'wind', n: 50 },
+    { id: 'osatellite', name: '空の灯台守',     note: '人工衛星管制局を50か所', k: 'own', gen: 'satellite', n: 50 },
+    { id: 'u10', name: '道具箱',         note: '強化を10個 買う',         k: 'ups', n: 10 },
+    { id: 'u25', name: '道具棚',         note: '強化を25個 買う',         k: 'ups', n: 25 },
+    { id: 'u45', name: '灯台の工房',     note: '強化を45個 買う',         k: 'ups', n: 45 },
+    { id: 'kall', name: '岬の仲間たち',  note: '4種の生き物に出会う',     k: 'metAll' },
+    { id: 'kwhale', name: '守り神と五度', note: 'クジラに5回 出会う',      k: 'met', kind: 'whale', n: 5 },
+    { id: 'r2',  name: '灯台と呼ばれて', note: '「岬の小さな灯台」になる', k: 'rank', n: 2 },
+    { id: 'r5',  name: '行き着く先',     note: '「世界の果ての灯台」になる', k: 'rank', n: 5 },
+    { id: 'eGoldFest',  name: '凪の祭り',     note: '凪の中で灯祭りの船を導く',       k: 'ev' },
+    { id: 'eFestCargo', name: '祭りの積み荷', note: '灯祭りのあいだに積み荷の船を導く', k: 'ev' },
+    { id: 'eFogShip',   name: '霧の中の船',   note: '霧のあいだに金の船を導く',       k: 'ev', hide: 1 },
+    { id: 'eAway8',     name: '長い留守',     note: '8時間の留守から戻る',            k: 'ev', hide: 1 }
+  ];
+  var ACH_X = 0.01;   // 1件ごとの産出の伸び
+  var AMAP = {};
+  ACHS.forEach(function (a) { AMAP[a.id] = a; });
+  function achCount() { var n = 0; ACHS.forEach(function (a) { if (state.ach[a.id]) n++; }); return n; }
+  function achPages() { var n = 0; UPS.forEach(function (u) { if (u.page && state.ups[u.id]) n++; }); return n; }
+  function achMult() { return 1 + ACH_X * achCount() * (1 + achPages()); }
+  function lifeTotal() { return state.total; }   // 集めた光の合計を読む所はここだけ（のちに周をまたいだ合計へ差し替えられる）
+  function achDone(a, c) {
+    switch (a.k) {
+      case 'total': return lifeTotal() >= a.n;
+      case 'cps': return c >= a.n;
+      case 'taps': return state.taps >= a.n;
+      case 'guided': return state.guided >= a.n;
+      case 'ship': return state.shipN[a.kind] >= a.n;
+      case 'own': return state.owned[a.gen] >= a.n;
+      case 'ups': return UPS.filter(function (u) { return state.ups[u.id]; }).length >= a.n;
+      case 'metAll': return metKinds() >= KINDS.length;
+      case 'met': return (state.met[a.kind] || 0) >= a.n;
+      case 'rank': return state.rank >= a.n;
+      default: return false;
+    }
+  }
+  // 数で確かめられる頁をまとめて記す。quiet=読み込んだときの一括（お知らせはまとめて1行）
+  function achCheck(quiet) {
+    var c = cpsBase(), got = [];   // 毎秒は追い風・凪・灯祭りを除いた値で（広告を見なくても届く）
+    ACHS.forEach(function (a) { if (a.k !== 'ev' && !state.ach[a.id] && achDone(a, c)) { state.ach[a.id] = 1; got.push(a); } });
+    if (!got.length || quiet) return got.length;
+    got.forEach(function (a) { track('ach_get', { ach: a.id }); });
+    achNews(got);
+    return got.length;
+  }
+  function achEvent(id) {
+    if (!state || state.ach[id] || !AMAP[id]) return;
+    state.ach[id] = 1;
+    track('ach_get', { ach: id });
+    achNews([AMAP[id]]);
+  }
+  function achNews(got) {
+    var per = 1 + achPages();   // 日誌の頁を買うと、1件あたりの伸びが増える
+    if (got.length === 1) toast('日誌に記した：' + got[0].name + '（産出+' + per + '%）', 3200, 2, 'ach');
+    else toast('日誌に ' + got.length + '件 記した（産出+' + got.length * per + '%）', 3200, 2, 'ach');
+    sfx('page');
+  }
+
   // ---------- ゲームの計算 ----------
   function genMult(id) {
     var m = 1;
@@ -1106,7 +1270,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   function allMult() {
     var m = 1;
     UPS.forEach(function (u) { if (state.ups[u.id] && u.all) m *= u.all; });
-    return m * (1 + 0.05 * metKinds()); // 図鑑: 出会った生き物1種ごとに +5%
+    return m * (1 + 0.05 * metKinds()) * achMult(); // 図鑑: 出会った生き物1種ごとに +5%。日誌: 1件ごとに +1%
   }
   function unit(g) { return g.cps * genMult(g.id) * allMult(); }
   function cpsBase() {
@@ -1122,7 +1286,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (u.tap) m *= u.tap;
       if (u.share) share += u.share;
     });
-    return m + cps() * share;
+    return (m + cps() * share) * (buffOn('mirror') ? SHIP_KINDS.mirror.x : 1);
   }
   function rangeOf(total) { return 3 + 1.5 * Math.log10(1 + total); }
   function rankIdx(r) {
@@ -1268,14 +1432,26 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (!bonus || bonus.done) return;
     bonus.done = true;
     buzz([20, 30, 20]); sfx('guide');
-    var reward = Math.max(100, cps() * 45);
-    gain(reward);
+    var kind = bonus.gold || 'cargo', K = SHIP_KINDS[kind];
     var moored0 = harborCount();
     state.guided++;
+    state.shipN[kind]++;
     if (harborCount() > moored0) { popStart('harbor', harborCount() - 1); ringAt('harbor', harborCount() - 1); }
     if ([1, 10, 50, 100].indexOf(state.guided) >= 0) track('ship_guided', { count: state.guided });
-    showGain(reward);
-    toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
+    if ([1, 10, 50].indexOf(state.shipN[kind]) >= 0) track('ship_kind', { kind: kind, count: state.shipN[kind] });
+    if (fogLeft > 0) achEvent('eFogShip');
+    if (kind === 'fest' && goldenActive()) achEvent('eGoldFest');
+    if (kind === 'cargo' && buffOn('fest')) achEvent('eFestCargo');
+    if (kind === 'cargo') {
+      var reward = Math.max(SHIP_MIN, cps() * SHIP_SEC * shipUp('cargo'));
+      gain(reward);
+      showGain(reward);
+      toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
+    } else {
+      // 同じ効果は重ねない（効いている間は同じ種類の船が来ない）。終わる時刻をセーブに持つ
+      state.buff[kind] = Date.now() + shipSec(kind) * 1000;
+      toast(K.name + '：' + shipSec(kind) + '秒 ' + K.what + '×' + K.x, 3600, 2, 'buff-' + kind);
+    }
     $('guide').hidden = true;
     renderAll(); save();
   }
@@ -1287,6 +1463,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (sec >= 60 && g >= 1) {
       var h = dt / 3600;
       track('welcome_back', { hours: h < 1 ? '0-1' : h < 3 ? '1-3' : h < 8 ? '3-8' : '8+' });
+      if (dt >= 28800) achEvent('eAway8');
       showWelcome(g);
     }
   }
@@ -1320,6 +1497,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var m = 1;
     if (Date.now() < state.boostUntil) m *= 2;
     if (goldenActive()) m *= 1.5;
+    if (buffOn('fest')) m *= SHIP_KINDS.fest.x;
     return m;
   }
   function startBoost() {
@@ -1410,6 +1588,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (!show) return;
     b.classList.toggle('on', on);
     b.setAttribute('aria-disabled', on ? 'true' : 'false');
+    // 灯祭り・凪の間だけ、重ねたときの倍率を小さい字で見せる（ポップアップは出さない）
+    var mx = on ? 1 : boostMult(), combo = mx > 1 ? parseFloat((mx * 2).toFixed(1)) : 0;
     if (on) {
       var s = Math.ceil((state.boostUntil - Date.now()) / 1000);
       $('boostTitle').textContent = '追い風が吹いている';
@@ -1417,10 +1597,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       $('boostTag').textContent = '光×2';
     } else {
       $('boostTitle').textContent = '追い風を呼ぶ';
-      $('boostSub').textContent = '3分間 光×2';
+      $('boostSub').textContent = combo ? '重ねると 光×' + combo : '3分間 光×2';
       $('boostTag').textContent = '広告';
     }
-    b.setAttribute('aria-label', on ? '追い風が吹いている。' + $('boostSub').textContent : '広告を見て追い風を呼ぶ（3分間 光が2倍）');
+    b.setAttribute('aria-label', on ? '追い風が吹いている。' + $('boostSub').textContent : '広告を見て追い風を呼ぶ（3分間 光が2倍' + (combo ? '。いまの効果と重ねると光×' + combo : '') + '）');
   }
 
   // ---------- 音（すべてその場で合成。音のファイルは使わない） ----------
@@ -1579,6 +1759,11 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
         if (k === 'whale') shipHorn(t + 0.3, 0.025);
       }
       if (opt && opt.first) glass(t + 0.25, 0.02);
+    } else if (name === 'page') {
+      // 日誌に記す：ペン先が紙を2回走る小さな擦れと、かすかなガラスの音
+      burst(t, 'bandpass', rnd(3000, 4200), 2, 0.03, 0.01, 0.12);
+      burst(t + 0.13, 'bandpass', rnd(2600, 3600), 2, 0.025, 0.01, 0.09);
+      glass(t + 0.25, 0.015);
     } else if (name === 'rank') {
       // 格上げ：深い鐘と、ふくらむ風
       bell(t, 0.12, rnd(96, 104));
@@ -1708,7 +1893,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   function visibleUps() {
     return UPS.filter(function (u) {
-      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] > 0);
+      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] >= (u.need || 1)) && (!u.guided || state.guided >= u.guided) && (!u.achs || achCount() >= u.achs);
     }).sort(function (a, b) { return a.cost - b.cost; });
   }
   // 強化タブは最初の強化が見えたとき、まとめ買いは設備を合計10個持ったときに出す（一度出たら出したまま）
@@ -1822,6 +2007,22 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
 
 
+  var achSig = '';
+  function renderAch() {
+    if ($('menuPage').hidden && achSig) return;   // 一覧はメニューを開いているときだけ書き直す
+    var sig = ACHS.map(function (a) { return state.ach[a.id] ? 1 : 0; }).join('') + ':' + achPages();
+    if (sig === achSig) return;
+    achSig = sig;
+    var n = achCount();
+    $('achSum').innerHTML = ACHS.length + '件のうち' + n + '件' + (n ? '・産出 <b>+' + Math.round((achMult() - 1) * 100) + '%</b>' : '');
+    var ul = $('achList'), h = '';
+    ACHS.forEach(function (a) {
+      var got = !!state.ach[a.id], hid = a.hide && !got;
+      h += '<li' + (got ? ' class="got"' : '') + '><span class="aname">' + (hid ? '？？？' : a.name) + '</span><span class="anote">' + (hid ? 'まだ書かれていない頁' : a.note) + '</span></li>';
+    });
+    ul.innerHTML = h;
+  }
+
   var htmlCache = {};
   function setHTML(id, html) {
     if (htmlCache[id] === html) return;
@@ -1876,9 +2077,15 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     }
     $('light').textContent = fmtNum(Math.floor(state.light));
     // 毎秒の横に、追い風（×2）と凪の恵み（凪×1.5）を言葉で添える
-    var tags = '';
-    if (Date.now() < state.boostUntil) tags += '<em>追い風×2</em>';
-    if (goldenActive()) tags += '<em>凪×1.5</em>';
+    // 灯祭り・鏡職人は残りの秒も小さく。3つ以上重なったら、毎秒に掛かる倍率を「重ね×N」の1つにまとめて1行に収める
+    var tagList = [];
+    if (Date.now() < state.boostUntil) tagList.push(['追い風', 2]);
+    if (goldenActive()) tagList.push(['凪', 1.5]);
+    if (buffOn('fest')) tagList.push([SHIP_KINDS.fest.tag, SHIP_KINDS.fest.x, buffLeft('fest')]);
+    var mirrorTag = buffOn('mirror') ? [SHIP_KINDS.mirror.tag, SHIP_KINDS.mirror.x, buffLeft('mirror')] : null;
+    if (tagList.length + (mirrorTag ? 1 : 0) >= 3) tagList = [['重ね', parseFloat(boostMult().toFixed(1))]];
+    if (mirrorTag) tagList.push(mirrorTag);
+    var tags = tagList.map(function (t) { return '<em>' + t[0] + '×' + t[1] + (t[2] ? '<small>' + t[2] + '</small>' : '') + '</em>'; }).join('');
     setHTML('cps', '毎秒 ' + fmtNum(c) + tags);
     $('tapGain').textContent = '+' + fmtNum(tapPower());
     renderRank(Math.min(ri, state.rank));   // おかえり中に上がった格は、格上げを見せるまで見出しも前のまま
@@ -1892,6 +2099,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     renderBoost();
     renderGoal();
     renderZukan();
+    renderAch();
     tutorialTick();
   }
 
@@ -1925,6 +2133,29 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
 
   // ---------- 船 ----------
+  // 金の船の種類。w=出る重み（いま効いている効果と同じ種類は選ばない）、sec=効く秒数、x=倍率、col=船の上の印の色
+  // 最初の1隻は必ず積み荷の船（光 SHIP_MIN 以上）。積み荷は毎秒の SHIP_SEC 秒ぶん（灯祭り・凪の間はその倍率ごと）
+  var SHIP_KINDS = {
+    cargo:  { name: '積み荷の船', call: '金の船が通ります',       w: 75, col: '#F2C14E' },
+    fest:   { name: '灯祭りの船', call: '灯祭りの船が通ります',   w: 10, sec: 40, x: 5,  what: '光',     tag: '祭', col: '#E2643F' },
+    mirror: { name: '鏡職人の船', call: '鏡職人の船が通ります',   w: 15, sec: 15, x: 30, what: '磨く力', tag: '磨', col: '#7DB9E0' }
+  };
+  var SHIP_SEC = 45, SHIP_MIN = 30;
+  // 霧の夜：霧笛を持っていると霧が出る。霧のあいだは次の金の船までの時間が FOG_SHIP_RATE 倍の速さで進む
+  var FOG_SHIP_RATE = 2;
+  function buffOn(k) { return !!state && state.buff[k] > Date.now(); }
+  function buffLeft(k) { return Math.max(0, Math.ceil((state.buff[k] - Date.now()) / 1000)); }
+  function shipUp(kind) { var m = 1; UPS.forEach(function (u) { if (u.ship === kind && state.ups[u.id]) m *= u.x; }); return m; }
+  function shipSec(k) { return Math.round(SHIP_KINDS[k].sec * shipUp('long')); }
+  function shipGap() { return (25 + Math.random() * 25) / shipUp('gap'); }
+  function pickShipKind() {
+    if (state.guided === 0) return 'cargo';
+    var w = {}, sum = 0, k;
+    for (k in SHIP_KINDS) { w[k] = k !== 'cargo' && buffOn(k) ? 0 : SHIP_KINDS[k].w; sum += w[k]; }
+    var r = Math.random() * sum;
+    for (k in w) { r -= w[k]; if (r < 0) return k; }
+    return 'cargo';
+  }
   function seaBottom() { return VH * 0.78; }
   function spawnShip(isBonus) {
     var dir = Math.random() < 0.5 ? 1 : -1;
@@ -1946,7 +2177,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     ships.push(s);
     if (isBonus) {
       bonus = s;
-      $('guideText').textContent = '金の船が通ります';
+      s.gold = pickShipKind();
+      $('guideText').textContent = SHIP_KINDS[s.gold].call;
       $('guide').hidden = false;
     }
     return s;
@@ -1966,7 +2198,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       s.x += s.dir * s.speed * dt;
       var gone = (s.dir > 0 && s.x > XR + 70) || (s.dir < 0 && s.x < XL - 70);
       if (gone && s === bonus) {
-        bonus = null; nextBonus = 25 + Math.random() * 25;
+        bonus = null; nextBonus = shipGap();
         $('guide').hidden = true;
       }
       return !gone;
@@ -1978,7 +2210,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ambientTimer = 2 + Math.random() * 4;
     }
     if (!bonus) {
-      nextBonus -= dt;
+      nextBonus -= dt * (fogLeft > 0 ? FOG_SHIP_RATE : 1);
       if (nextBonus <= 0) spawnShip(true);
     }
   }
@@ -3218,9 +3450,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       var s = bonus, cy = s.y0 - 10 * s.sc, rr = 22 * s.sc;
       ctx.lineWidth = 4; ctx.strokeStyle = '#33261F';
       ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
-      ctx.lineWidth = 2.2; ctx.strokeStyle = '#F2C14E';
+      var col = SHIP_KINDS[s.gold || 'cargo'].col;   // 種類ごとに印の色だけ変える
+      ctx.lineWidth = 2.2; ctx.strokeStyle = col;
       ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
-      ctx.fillStyle = '#F2C14E'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.5;
+      ctx.fillStyle = col; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(s.x - 6, cy - rr - 12); ctx.lineTo(s.x + 6, cy - rr - 12); ctx.lineTo(s.x, cy - rr - 4); ctx.closePath();
       ctx.fill(); ctx.stroke();
     }
@@ -3307,7 +3540,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
 
   // ---------- メインループ ----------
-  var last = Date.now(), uiAcc = 0, saveAcc = 0;
+  var last = Date.now(), uiAcc = 0, saveAcc = 0, achAcc = 0;
   function tick(dt) {
     var c = cps();
     if (c > 0 && dt > 0) gain(c * dt);
@@ -3349,6 +3582,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     draw(now / 1000);
     uiAcc += dt; saveAcc += dt;
     if (uiAcc >= 0.1) { uiAcc = 0; renderAll(); }
+    achAcc += dt;
+    if (achAcc >= 1) { achAcc = 0; achCheck(false); }
     if (saveAcc >= 5) { saveAcc = 0; save(); }
     requestAnimationFrame(frame);
   }
@@ -3477,7 +3712,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     $('resetYes').addEventListener('click', function () {
       try { localStorage.removeItem(KEY); } catch (e) {}
       track('game_reset');
-      state = fresh(); upSig = null; theta = 0; nextBonus = 10; towerGrow = 0; buoyAnim = []; reachShown = null;
+      state = fresh(); upSig = null; achSig = ''; theta = 0; nextBonus = 10; towerGrow = 0; buoyAnim = []; reachShown = null;
       seedShips(); renderAll();
       $('resetAsk').hidden = true; $('resetBtn').hidden = false;
       toast('最初から始めます', 2600, 2);
@@ -3518,6 +3753,11 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     towerGrow = rankIdx(rangeNow);
     seedShips();
     nextBonus = loaded ? 20 + Math.random() * 20 : 10;
+    // 日誌ができる前から遊んでいる人：数で確かめられる頁を静かに記し、1行だけ知らせる（進み具合は足すだけ）
+    if (loaded) {
+      var backN = achCheck(true);
+      if (backN > 0) { toast('これまでの歩みを、日誌に ' + backN + '件 記した', 4600, 2, 'ach'); track('ach_backfill', { count: backN }); }
+    }
     last = Date.now();
     if (loaded && !fromHot) {
       var dt = (Date.now() - state.seen) / 1000;
