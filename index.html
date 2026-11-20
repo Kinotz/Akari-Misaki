@@ -530,6 +530,25 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   var towerGrow = 0, rankFlash = 0;
   // 手触り：磨くと光線が一瞬伸び（beamKick）、灯りから光の粒（sparks）が舞う
   var beamKick = 0, sparks = [];
+  // 買ったとき：景色のその設備のあたりに、刷った光の輪がひろがる
+  var buyRings = [];
+  function equipSpot(id) {
+    var off = towerOff();
+    switch (id) {
+      case 'lamp': return { x: W * 0.25, y: islandTopY(0.25) - 8 };
+      case 'keeper': return { x: W * 0.355, y: islandTopY(0.355) - VH * 0.04 };
+      case 'horn': return { x: lampX + W * 0.05, y: VH * 0.32 + off };
+      case 'plant': return { x: W * 0.88, y: VH * 0.92 };
+      case 'wind': return { x: W * 0.86, y: horizon - VH * 0.06 };
+      case 'satellite': return { x: W * 0.5, y: horizon * 0.22 };
+      default: return { x: lampX, y: lampY };   // 反射鏡・回転機構・フレネルレンズは灯室
+    }
+  }
+  function ringAt(id) {
+    if (reduce) return;
+    var p = equipSpot(id);
+    buyRings.push({ x: p.x, y: p.y, age: 0 });
+  }
   var fog = 0, fogTarget = 0, fogTimer = 70 + Math.random() * 60, fogLeft = 0;
   var satT = Math.random() * 60;
 
@@ -774,7 +793,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     state.light -= p.cost;
     state.owned[id] += p.n;
     pulse = Math.max(pulse, 0.6);
-    sfx('buy'); flashRow(genEls[id] && genEls[id].row);
+    sfx('buy'); flashRow(genEls[id] && genEls[id].row); ringAt(id);
     renderAll(); save();
   }
   function buyUp(id) {
@@ -782,7 +801,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     if (state.ups[id] || state.light < u.cost) return;
     state.light -= u.cost;
     state.ups[id] = true;
-    sfx('buy'); flashRow(upEls[id] && upEls[id].row);
+    sfx('buy'); flashRow(upEls[id] && upEls[id].row); ringAt(UMAP[id].gen || 'mirror');
     renderAll(); save();
   }
   function flashRow(el) {
@@ -2150,6 +2169,18 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       ctx.fill(); ctx.stroke();
     }
   }
+  function drawBuyRings() {
+    for (var i = 0; i < buyRings.length; i++) {
+      var r = buyRings[i], k = r.age / 0.8, rad = 8 + 34 * k;
+      ctx.globalAlpha = (1 - k) * 0.35; ctx.fillStyle = '#FFF4D6';
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad * 0.7, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1 - k; ctx.lineWidth = 3; ctx.strokeStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, 6.283); ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#33261F';
+      ctx.beginPath(); ctx.arc(r.x + 2, r.y + 1.5, rad, 0, 6.283); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
   function drawSparks() {
     // 灯りから舞う光の粒（刷った小さな丸）
     for (var i = 0; i < sparks.length; i++) {
@@ -2177,7 +2208,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     }
     drawPier(t); drawIsland(); drawHut(t); drawTower(); drawCreature(t);
     drawFog(t);
-    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks();
+    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings();
     ctx.globalCompositeOperation = 'lighter';
     drawRankFlash();
     ctx.globalCompositeOperation = 'source-over';
@@ -2193,6 +2224,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     theta += ((reduce ? 0.35 : 0.9) + 0.08 * Math.sqrt(state.owned.clock || 0)) * dt;
     pulse = Math.max(0, pulse - dt * 3);
     beamKick = Math.max(0, beamKick - dt * 2.2);
+    for (var bi = buyRings.length - 1; bi >= 0; bi--) {
+      buyRings[bi].age += dt;
+      if (buyRings[bi].age > 0.8) buyRings.splice(bi, 1);
+    }
     for (var si = sparks.length - 1; si >= 0; si--) {
       var sk = sparks[si];
       sk.age += dt; sk.x += sk.vx * dt; sk.y += sk.vy * dt; sk.vy += 40 * dt;
