@@ -21,325 +21,358 @@
 <meta name="twitter:image" content="https://kinotz.github.io/Akari-Misaki/ogimage.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&display=swap">
 <style>
-/* Layout: the upper half of the screen is the cape itself (canvas only, no text over it).
-   The lower half is one frosted "keeper's sheet": title and rank, a scrolling body with the
-   goal, supplies and records, and a fixed dock with the light counter and the lens button.
-   Single dark theme by choice: the whole page is a night at the cape. */
+/* 画面の上半分は岬の景色（キャンバスだけ。文字は置かない）。
+   下半分は版画の絵本のような紙の「灯台守の手帳」。紙と押せるものの色は時間帯で移る。 */
 :root {
-  color-scheme: dark;
-  --ink: #0b1a28;
-  --panel: #112636;
-  --panel-hi: #17324a;
-  --line: #27465f;
-  --hair: rgba(143, 167, 184, 0.16);
-  --text: #e9eff3;
-  --muted: #8fa7b8;
-  --faint: #6c8597;
-  --lamp: #ffd68a;
-  --lamp-deep: #f0a24a;
-  --lamp-ink: #2a1a05;
-  --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  --font-body: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui, sans-serif;
+  color-scheme: light;
+  /* B案「版画の絵本」の色。--accent（押せるもの）と --paper（手帳の紙）は時間帯で JS が書き換える */
+  --ink-b: #33261F;      /* 墨茶：文字と線（固定） */
+  --on: #FFF8EA;         /* 押せるもの・追い風の上の文字（固定） */
+  --teal: #236A6A;       /* 追い風ボタン専用 */
+  --nano: #F2C14E;       /* お知らせ（墨茶の枠線つき） */
+  --accent: #B8492B;     /* 押せるもの：夜・夜明け #8F5F12／昼 #C42A2A／夕暮れ #B8492B */
+  --paper: #F2E4C8;      /* 手帳の紙：夜 #DADDE2／夜明け #F1E1DA／昼 #F8F5EE／夕暮れ #F2E4C8 */
+  --rule: rgba(51, 38, 31, 0.35);  /* 行の点線などの細い区切り（飾り） */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='2'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .3 -.12'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --edge: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 8' preserveAspectRatio='none'%3E%3Cpath d='M0 8V5Q8 3 15 5T31 4T48 6T66 3.5T84 5T103 3T122 5.5T140 4T160 5T178 3T197 5T215 4T234 6T252 3.5T272 5T290 3T310 5T330 4T348 5.5T360 4V8Z'/%3E%3C/svg%3E");
+  --font-body: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui, sans-serif;
+  --font-display: var(--font-body);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; overflow: hidden;
-  background: var(--ink);
-  color: var(--text);
+  background: #1D2944;
+  color: var(--ink-b);
   font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.6;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-tap-highlight-color: transparent;
 }
 button { font: inherit; color: inherit; touch-action: manipulation; }
-:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--ink-b); outline-offset: 2px; }
 [hidden] { display: none !important; }
+.num { font-variant-numeric: tabular-nums; }
 
 /* 画面いっぱいの海と空。上半分は文字を置かず、岬の景色だけを見せる。 */
-.scene { position: fixed; inset: 0; z-index: 0; background: #111c38; }
+.scene { position: fixed; inset: 0; z-index: 0; background: #1D2944; }
 #sea { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: pointer; }
 
-.bgm {
-  position: fixed; z-index: 2;
-  left: max(14px, env(safe-area-inset-left, 0px)); top: max(14px, env(safe-area-inset-top, 0px));
-  width: 36px; height: 36px; border-radius: 50%;
-  border: 1px solid rgba(233, 239, 243, 0.16); background: rgba(8, 18, 28, 0.38); color: var(--muted);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  font-size: 15px; line-height: 1; display: grid; place-items: center; cursor: pointer;
-}
-.bgm[aria-pressed="true"] { border-color: rgba(255, 214, 138, 0.6); color: var(--lamp); }
-
-/* ---------- 下半分：灯台守の手帳 ---------- */
+/* ---------- 下半分：灯台守の手帳（紙） ---------- */
 .sheet {
   position: fixed; z-index: 1;
   top: 50%; bottom: 0; left: 50%; transform: translateX(-50%);
   width: min(100%, 560px);
   display: flex; flex-direction: column;
-  background: linear-gradient(180deg, rgba(10, 22, 34, 0.58) 0%, rgba(7, 16, 26, 0.84) 55%, rgba(6, 13, 21, 0.92) 100%);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15); backdrop-filter: blur(18px) saturate(1.15);
-  border-radius: 24px 24px 0 0;
-  box-shadow: 0 -24px 48px -24px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 233, 190, 0.14);
-}
-.sheet::before {
-  /* 上端にうっすら灯りの色を差す */
-  content: ""; position: absolute; left: 24px; right: 24px; top: 0; height: 1px; pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(255, 214, 138, 0.45), transparent);
+  background: var(--grain), var(--paper);
+  /* 上端は紙を手でちぎったような、わずかに波打つ線 */
+  -webkit-mask: var(--edge) top / 100% 8px no-repeat, linear-gradient(#000, #000) 0 7px / 100% calc(100% - 7px) no-repeat;
+  mask: var(--edge) top / 100% 8px no-repeat, linear-gradient(#000, #000) 0 7px / 100% calc(100% - 7px) no-repeat;
+  padding-top: 6px;
 }
 
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .sheet-head {
-  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 16px max(22px, env(safe-area-inset-right, 0px)) 12px max(22px, env(safe-area-inset-left, 0px));
+  flex: none; display: flex; align-items: center; gap: 2px;
+  padding: 4px max(4px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
 }
-h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
 .rank {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
-  cursor: pointer; background: none; border: 0; padding: 0; text-align: right;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  cursor: pointer; background: none; border: 0; padding: 4px 0; text-align: left; color: var(--ink-b);
 }
-.rank-name { font: 600 13px/1.2 var(--font-display); color: var(--lamp); letter-spacing: 0.06em; }
-.range { font-size: 11px; line-height: 1.2; color: var(--muted); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
-.range b { font-weight: 700; color: var(--text); }
+.rank b { font: 700 17px/1.3 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* 格が上がった瞬間：見出しの上に、お知らせ色の告知を数秒だけ */
+.sheet-head { position: relative; }
+.rank-news {
+  position: absolute; z-index: 2; left: max(12px, env(safe-area-inset-left, 0px)); right: 100px; top: 4px; bottom: 0;
+  display: flex; flex-direction: column; justify-content: center; padding: 2px 12px;
+  background: var(--nano); border: 2.5px solid var(--ink-b); box-shadow: 4px 3px 0 var(--accent); color: var(--ink-b);
+  animation: newsIn 0.35s ease-out;
+}
+.rank-news small { font-size: 13px; font-weight: 700; line-height: 1.3; }
+.rank-news b { font-size: 18px; font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes newsIn { 0% { transform: translateY(-6px) scale(0.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
+/* 次の格までの進み：点が一つずつ塗られていき、最後に小さな灯台 */
+.steps { display: flex; align-items: center; gap: 5px; }
+.steps i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink-b); flex: none; }
+.steps i.on { background: var(--accent); border-color: var(--accent); }
+.steps svg { flex: none; margin-left: 1px; }
+.icon {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink-b);
+}
+#bgmBtn .mute { display: none; }
+#bgmBtn[data-on="false"] .wave { display: none; }
+#bgmBtn[data-on="false"] .mute { display: inline; }
+/* 音の切り替え（環境音と効果音は別々） */
+.snd-panel {
+  position: absolute; z-index: 6; left: max(12px, env(safe-area-inset-left, 0px)); top: 52px; width: 224px;
+  display: flex; flex-direction: column; padding: 4px 0;
+  background: var(--grain), var(--paper); border: 2.5px solid var(--ink-b); box-shadow: 4px 3px 0 var(--ink-b);
+}
+.sw-list { display: flex; flex-direction: column; border-top: 2px dotted var(--rule); }
+.sw {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px;
+  background: none; border: 0; border-bottom: 2px dotted var(--rule); color: var(--ink-b); font-size: 15px; font-weight: 700; text-align: left; cursor: pointer;
+}
+.snd-panel .sw:last-child { border-bottom: 0; }
+.sw::after { content: "オフ"; flex: none; min-width: 52px; padding: 2px 0; text-align: center; font-size: 13px; border: 2px solid var(--ink-b); }
+.sw[aria-pressed="true"]::after { content: "オン"; background: var(--ink-b); color: var(--paper); }
+
+/* 集めた光と、磨くボタン（手帳の上の段） */
+.act {
+  flex: none; position: relative; display: flex; align-items: center; gap: 12px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 2px max(16px, env(safe-area-inset-left, 0px));
+}
+.bank { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.bank strong { font: 700 38px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bank .cps { margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.bank .cps em { font-style: normal; font-weight: 700; margin-left: 6px; }
+
+/* 次の目標（1行） */
+.goal {
+  flex: none; display: flex; align-items: center; gap: 8px; font-size: 15px; min-height: 48px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  border-bottom: 2.5px solid var(--ink-b);
+}
+.goal b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.goal .goal-left { margin-left: auto; flex: none; }
+.goal[data-ready="true"] .goal-left { font-weight: 700; }
 
 .sheet-body {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  display: flex; flex-direction: column; gap: 20px;
-  padding: 6px max(22px, env(safe-area-inset-right, 0px)) 22px max(22px, env(safe-area-inset-left, 0px));
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 18px), transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 18px), transparent 100%);
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 4px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px));
 }
 .sheet-body::-webkit-scrollbar { display: none; }
 .sheet-body > * { min-width: 0; flex: none; }
 
-.label {
-  font-size: 10.5px; letter-spacing: 0.18em; color: var(--faint);
-}
+.label { font-size: 13px; font-weight: 700; }
 
-/* 金色の船が来たときだけ出る呼びかけ */
-.guide {
-  position: sticky; top: 0; z-index: 2;
-  width: 100%; min-height: 44px; border-radius: 999px; cursor: pointer;
-  border: 1px solid rgba(255, 214, 138, 0.7); background: rgba(40, 30, 12, 0.85); color: var(--lamp);
-  font: 700 14px/1 var(--font-display); letter-spacing: 0.12em;
-  animation: ring 1.6s ease-out infinite;
-}
-@keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(255, 214, 138, 0.45); } 100% { box-shadow: 0 0 0 12px rgba(255, 214, 138, 0); } }
 
-.hint { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+.dot { display: inline-block; width: 9px; height: 9px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
-/* 次の目標 */
-.goal { display: flex; flex-direction: column; gap: 8px; }
-.goal-line { display: flex; align-items: baseline; gap: 10px; }
-.goal-label { flex: none; font-size: 10.5px; letter-spacing: 0.18em; color: var(--faint); }
-.goal-line b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px/1.3 var(--font-display); }
-.goal-left { margin-left: auto; flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.goal[data-ready="true"] .goal-left { color: var(--lamp); font-weight: 700; }
-.goal-bar { height: 3px; border-radius: 2px; background: rgba(143, 167, 184, 0.14); overflow: hidden; }
-.goal-bar i {
-  display: block; height: 100%; width: 0; border-radius: 2px;
-  background: linear-gradient(90deg, var(--lamp-deep), var(--lamp));
-  box-shadow: 0 0 8px rgba(255, 214, 138, 0.6);
-}
-.dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--lamp); vertical-align: middle; box-shadow: 0 0 6px var(--lamp); }
-
-/* 追い風(広告ブースト) */
+/* 追い風(広告ブースト)：青緑のボタン。広告が使えるときだけ出す。吹いている間は同じ場所で残り時間を見せる */
 .boost {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 14px; border-radius: 16px;
-  border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.025);
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 52px; padding: 0 12px;
+  background: var(--teal); color: var(--on); border: 0; border-radius: 0; box-shadow: 3px 2px 0 var(--ink-b);
+  text-align: left; cursor: pointer;
 }
-.boost[data-on="true"] { border-color: rgba(255, 214, 138, 0.45); background: rgba(255, 214, 138, 0.06); }
-.boost-text { display: flex; flex-direction: column; min-width: 0; }
-.boost-text b { font: 700 14px/1.4 var(--font-display); }
-.boost-text span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.boost-btn {
-  flex: none; min-height: 36px; padding: 0 16px; border-radius: 999px; cursor: pointer;
-  border: 1px solid rgba(255, 214, 138, 0.7); background: transparent; color: var(--lamp);
-  font-weight: 700; font-size: 12.5px; letter-spacing: 0.06em;
-}
-.boost-btn:disabled { border-color: var(--hair); color: var(--faint); cursor: default; }
+.boost svg { flex: none; }
+.boost b { font-weight: 700; font-size: 16px; white-space: nowrap; }
+.boost span { flex: 1; font-size: 15px; white-space: nowrap; }
+.boost em { font-style: normal; font-weight: 700; font-size: 13px; line-height: 20px; padding: 0 5px; border: 2px solid var(--on); white-space: nowrap; }
+.boost.on { box-shadow: none; cursor: default; }
 
 /* 設備・強化 */
 .shop { display: flex; flex-direction: column; }
-.tabs { display: flex; align-items: center; gap: 20px; border-bottom: 1px solid var(--hair); }
+.tabs { display: flex; align-items: center; gap: 4px; border-bottom: 2.5px solid var(--ink-b); padding-bottom: 6px; }
 .tab {
-  background: none; border: 0; padding: 6px 0 10px; margin-bottom: -1px; cursor: pointer;
-  font: 700 15px/1.2 var(--font-display); letter-spacing: 0.1em; color: var(--faint);
-  border-bottom: 1.5px solid transparent; white-space: nowrap;
+  background: none; border: 0; padding: 6px 10px; cursor: pointer; border-radius: 0;
+  font: 700 15px/1.2 var(--font-display); color: var(--ink-b); white-space: nowrap;
 }
-.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--lamp); }
-.tab small { font: 500 11px var(--font-body); margin-left: 5px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
-.qty {
-  margin-left: auto; margin-bottom: 6px; display: flex; padding: 2px; gap: 2px;
-  border: 1px solid var(--hair); border-radius: 999px;
-}
+.tab[aria-selected="true"] { background: var(--ink-b); color: var(--paper); }
+.tab small { font: 500 13px var(--font-body); margin-left: 5px; font-variant-numeric: tabular-nums; }
+.qty { margin-left: auto; display: flex; gap: 2px; }
 .qty button {
-  background: transparent; border: 0; color: var(--muted); border-radius: 999px;
-  padding: 0 10px; font-size: 11.5px; min-height: 26px; cursor: pointer; white-space: nowrap;
+  background: transparent; border: 0; color: var(--ink-b); border-radius: 0;
+  padding: 0 9px; font-size: 15px; font-weight: 700; min-height: 32px; cursor: pointer; white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.qty button[aria-pressed="true"] { background: var(--lamp); color: var(--lamp-ink); font-weight: 700; }
+.qty button[aria-pressed="true"] { background: var(--ink-b); color: var(--paper); }
 
 .list { display: flex; flex-direction: column; }
 .row {
-  position: relative;
-  display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center;
-  width: 100%; min-height: 64px; padding: 12px 2px; text-align: left; cursor: pointer;
-  background: transparent; border: 0; border-bottom: 1px solid var(--hair);
+  display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px;
+  min-height: 52px; border-bottom: 2px dotted var(--rule);
 }
-.row:disabled { cursor: default; }
-.row.afford::before {
-  content: ""; position: absolute; left: -10px; top: 14px; bottom: 14px; width: 2px; border-radius: 2px;
-  background: var(--lamp); box-shadow: 0 0 8px rgba(255, 214, 138, 0.7);
+.row-main {
+  display: flex; align-items: center; gap: 8px; min-height: 48px; min-width: 0; padding: 0;
+  background: none; border: 0; text-align: left; color: var(--ink-b); cursor: pointer;
 }
-.row .own {
-  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
-  border: 1px solid var(--hair);
-  font: 700 14px/1 var(--font-display); color: var(--muted); font-variant-numeric: tabular-nums;
+.row-main .name { font: 700 16px/1.35 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-main .own { margin-left: auto; font-size: 15px; }
+/* 値段の札：買える＝色で塗り＋白文字＋墨茶のずれ影／買えない＝紙の地＋墨茶の枠線（塗りなし） */
+.price {
+  min-width: 88px; height: 40px; padding: 0 8px; border: 2.5px solid var(--ink-b); border-radius: 0;
+  background: transparent; color: var(--ink-b); font: 700 16px/1 var(--font-display); font-variant-numeric: tabular-nums;
+  transform: rotate(-1.2deg); cursor: pointer; white-space: nowrap;
 }
-.row.afford .own { color: var(--lamp); border-color: rgba(255, 214, 138, 0.45); }
-.row .info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.row .name { font: 700 15px/1.35 var(--font-display); letter-spacing: 0.04em; }
-.row .desc { font-size: 11.5px; line-height: 1.5; color: var(--muted); }
-.row .rate { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.row .buy { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-.row .cost { font: 700 16px/1.2 var(--font-display); color: var(--muted); font-variant-numeric: tabular-nums; }
-.row.afford .cost { color: var(--lamp); }
-.row .unit { font-size: 10.5px; color: var(--faint); letter-spacing: 0.1em; }
-.row.locked { cursor: default; opacity: 0.5; }
-.row.bought { animation: bought 0.7s ease-out; }
-@keyframes bought { 0% { background: rgba(255, 214, 138, 0.22); } 100% { background: transparent; } }
-.row.kind .own { border-radius: 8px; font-size: 14px; }
-.empty { margin: 0; padding: 18px 2px; color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--hair); }
+.price small { font-size: 13px; margin-left: 3px; }
+.price.ok { background: var(--accent); border-color: var(--accent); color: var(--on); box-shadow: 3px 2px 0 var(--ink-b); }
+.detail { grid-column: 1 / -1; padding: 0 0 10px; }
+.detail p { margin: 0; font-size: 15px; line-height: 1.5; }
+.detail .sub { font-size: 13px; margin-top: 2px; }
+.detail .sub:empty { display: none; }
+.row.tz { display: block; min-height: 0; padding: 12px 0; }
+.tz-text { margin: 0; font-size: 15px; }
+.row.bought .price { animation: stamp 0.35s ease-out; }
+@keyframes stamp { 0% { transform: rotate(-1.2deg) scale(0.88); } 60% { transform: rotate(-1.2deg) scale(1.05); } 100% { transform: rotate(-1.2deg) scale(1); } }
+.row.shake .price { animation: shake 0.3s ease-out; }
+@keyframes shake { 0%, 100% { transform: rotate(-1.2deg) translateX(0); } 25% { transform: rotate(-1.2deg) translateX(-4px); } 75% { transform: rotate(-1.2deg) translateX(4px); } }
+.empty { margin: 0; padding: 14px 0; font-size: 15px; border-bottom: 2px dotted var(--rule); }
 
-/* 岬の生き物(図鑑) */
-.zukan { display: flex; flex-direction: column; gap: 10px; }
-.zukan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.zukan-sum { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.zukan-sum b { color: var(--lamp); font-weight: 700; }
-.zukan-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.zukan-list li {
-  display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0;
-  padding: 10px 4px 8px; border-radius: 14px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.02);
+/* 手帳のメニュー（別ページ）：図鑑・言い伝え・記録・保存 */
+.page {
+  position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column;
+  background: var(--grain), var(--paper); padding-top: 6px;
+}
+.page-head {
+  flex: none; display: flex; align-items: center; gap: 8px;
+  padding: 4px max(4px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px));
+  border-bottom: 2.5px solid var(--ink-b);
+}
+.page-head h2 { flex: 1; margin: 0; font: 700 17px/1.3 var(--font-display); }
+.close { min-height: 44px; padding: 0 12px; background: none; border: 0; font-weight: 700; font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; color: var(--ink-b); }
+.page-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; gap: 22px;
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.page-body h3 { margin: 0 0 6px; font: 700 16px/1.4 var(--font-display); }
+.lead { margin: 0 0 6px; font-size: 15px; }
+.lead b { font-weight: 700; }
+.note { margin: 6px 0 0; font-size: 13px; line-height: 1.6; }
+/* 図鑑：標本帳のように、線画・名前・一文を1行ずつ */
+.zukan-list { list-style: none; margin: 0; padding: 0; border-top: 2px dotted var(--rule); }
+.zukan-list li { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 2px dotted var(--rule); }
+.zukan-list svg { width: 44px; height: 34px; color: var(--ink-b); opacity: 0.3; }
+.zukan-list li.met svg { opacity: 1; }
+.zukan-list .zname { display: block; font: 700 16px/1.3 var(--font-display); }
+.zukan-list .znote { display: block; font-size: 13px; line-height: 1.5; }
+.zukan-list .zcount { font-size: 15px; font-variant-numeric: tabular-nums; }
+.legend-text { margin: 0; font-size: 15px; line-height: 1.8; }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 12px; margin: 0; }
+.stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stats dt { font-size: 13px; }
+.stats dd { margin: 0; font: 700 17px/1.2 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.reset { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 15px; }
+.linkbtn {
+  background: none; border: 0; color: var(--ink-b); border-radius: 0; padding: 0 4px; min-height: 44px;
+  font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.linkbtn.danger { background: var(--nano); border: 2.5px solid var(--ink-b); text-decoration: none; padding: 0 12px; }
+
+/* 広告枠：買い物リストの末尾。ボタンと間違えないよう、上に余白と区切り線、「広告」の表示 */
+.adslot { display: flex; flex-direction: column; gap: 6px; margin-top: 24px; padding-top: 10px; border-top: 2.5px solid var(--ink-b); }
+.adslot-tag { font-size: 13px; font-weight: 700; }
+.adslot-body { display: flex; justify-content: center; align-items: center; min-height: 50px; max-width: 100%; overflow: hidden; }
+
+/* お知らせ：次の目標の行に重ねて1件ずつ出す（磨く・買う・追い風のボタンにはかぶせない） */
+.toast, .call {
+  position: absolute; z-index: 3; left: 0; right: 0; top: var(--goal-top, 150px); height: var(--goal-h, 48px);
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  background: var(--nano); border-top: 2.5px solid var(--ink-b); border-bottom: 2.5px solid var(--ink-b); color: var(--ink-b);
+  font-size: 15px; font-weight: 700; line-height: 1.4;
+}
+.toast { z-index: 4; pointer-events: none; }
+.call span { flex: 1; min-width: 0; }
+.call-btn {
+  flex: none; min-width: 72px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 0; cursor: pointer;
+  background: var(--accent); color: var(--on); font-weight: 700; font-size: 16px; box-shadow: 3px 2px 0 var(--ink-b);
+}
+/* 光の数のそばに出る「+N」 */
+.bank { position: relative; }
+.gain {
+  position: absolute; right: 4px; top: 2px; font-size: 16px; font-weight: 700; opacity: 0; pointer-events: none;
+}
+.gain.show { animation: gainUp 0.9s ease-out forwards; }
+@keyframes gainUp { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+
+.polish {
+  position: relative; flex: none; width: 96px; height: 96px; border: 0; padding: 0; cursor: pointer;
+  display: grid; place-items: center; align-content: center; background: none; color: var(--on);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+/* 版画の丸い版：アクセント色の版と、少しずれて刷られた墨茶の輪 */
+.polish .plate, .polish .ghost { position: absolute; inset: 4px; border-radius: 50%; transition: transform 0.07s ease-out; }
+.polish .plate { background: var(--accent); }
+.polish .ghost { border: 3px solid var(--ink-b); transform: translate(4px, 3px); }
+.polish span { position: relative; margin-top: -8px; font: 700 24px/1 var(--font-display); }
+.polish small { position: relative; margin-top: 6px; font: 700 13px/1.2 var(--font-body); font-variant-numeric: tabular-nums; }
+/* 押した瞬間：版がつぶれて、ずれていた輪がぴたりと重なり、インクの点が散る */
+.polish .ink {
+  position: absolute; inset: -10px; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, var(--accent) 0 2.5px, transparent 3px) 8px 10px / 26px 30px,
+              radial-gradient(circle, var(--ink-b) 0 2px, transparent 2.5px) 0 0 / 33px 27px;
+  -webkit-mask: radial-gradient(circle, transparent 0 47px, #000 48px 58px, transparent 59px);
+  mask: radial-gradient(circle, transparent 0 47px, #000 48px 58px, transparent 59px);
+}
+.polish:active .plate, .polish.press .plate { transform: scale(0.9, 0.86); }
+.polish:active .ghost, .polish.press .ghost { transform: translate(0, 0) scale(0.9, 0.86); }
+.polish.press .ink { opacity: 1; }
+.polish.press span, .polish.press small { transform: translateY(1px); }
+
+/* 案内：対象のまわりだけ明るく残し、ほかを薄く覆う（操作はさえぎらない）。吹き出しは手帳の中にだけ出す */
+.coach { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+.coach-hole {
+  position: fixed; border: 3px solid var(--nano); outline: 2.5px solid var(--ink-b);
+  box-shadow: 0 0 0 9999px rgba(51, 38, 31, 0.45);
+}
+.coach-hole.round { border-radius: 50%; }
+.coach-tip {
+  position: fixed; left: 16px; right: 16px; pointer-events: auto;
+  display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px;
+  background: var(--paper); border: 2.5px solid var(--ink-b); box-shadow: 4px 3px 0 var(--accent); color: var(--ink-b);
+}
+.coach-tip p { flex: 1; margin: 0; font-size: 16px; font-weight: 700; line-height: 1.4; }
+.coach-btns { flex: none; display: flex; }
+.coach-tip::after {
+  content: ""; position: absolute; left: var(--ax, 50%); margin-left: -9px; width: 0; height: 0;
+  border: 9px solid transparent;
+}
+.coach-tip.below::after { top: -20px; border-bottom: 11px solid var(--ink-b); }
+.coach-tip.above::after { bottom: -20px; border-top: 11px solid var(--ink-b); }
+.coach-tip.free::after { display: none; }
+
+/* おかえり：留守のあいだの光を数え上げる */
+.welcome {
+  position: absolute; z-index: 5; left: 16px; right: 16px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px;
+  background: var(--grain), var(--paper); border: 2.5px solid var(--ink-b); box-shadow: 5px 4px 0 var(--accent);
   text-align: center;
 }
-.zukan-list svg { width: 34px; height: 26px; color: var(--faint); opacity: 0.45; }
-.zukan-list .zname { font: 700 12px/1.3 var(--font-display); color: var(--faint); letter-spacing: 0.06em; }
-.zukan-list .zcount { font-size: 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.zukan-list li.met { border-color: rgba(255, 214, 138, 0.28); background: rgba(255, 214, 138, 0.04); }
-.zukan-list li.met svg { color: var(--lamp); opacity: 1; }
-.zukan-list li.met .zname { color: var(--text); }
-.zukan-list li.met .zcount { color: var(--muted); }
-.zukan-note { margin: 0; font-size: 11px; line-height: 1.7; color: var(--faint); }
-
-/* 岬の言い伝え */
-.legend summary {
-  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
-  font: 700 13px/1.4 var(--font-display); letter-spacing: 0.12em; color: var(--muted);
-}
-.legend summary::-webkit-details-marker { display: none; }
-.legend summary::before { content: '▸'; font-size: 10px; color: var(--faint); transition: transform 0.15s; }
-.legend[open] summary::before { transform: rotate(90deg); }
-.legend p { margin: 10px 0 0; font: 500 13px/1.95 var(--font-display); color: #b9c8d3; letter-spacing: 0.03em; }
-
-/* 記録 */
-.foot { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; border-top: 1px solid var(--hair); }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
-.stats div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.stats dt { font-size: 10px; letter-spacing: 0.12em; color: var(--faint); }
-.stats dd { margin: 0; font: 700 15px/1.2 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.note { margin: 0; font-size: 11px; line-height: 1.7; color: var(--faint); }
-.reset { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-.linkbtn {
-  background: none; border: 1px solid var(--hair); color: var(--muted); border-radius: 999px;
-  padding: 0 12px; font-size: 11.5px; cursor: pointer; min-height: 28px;
-}
-.linkbtn.danger { border-color: rgba(240, 169, 156, 0.5); color: #f0a99c; }
-
-/* 広告枠 */
-.adslot { display: flex; flex-direction: column; gap: 6px; }
-.adslot-tag { font-size: 10px; letter-spacing: 0.18em; color: var(--faint); }
-.adslot-body { display: flex; justify-content: center; align-items: center; min-height: 50px; max-width: 100%; overflow: hidden; }
-.adslot-dummy {
-  display: grid; place-items: center; width: 320px; max-width: 100%; height: 50px;
-  border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); font-size: 12px;
-}
-
-/* お知らせ(手帳の中、ドックのすぐ上に出る) */
-.toast {
-  position: absolute; z-index: 3; left: 50%; transform: translateX(-50%);
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  width: max-content; max-width: calc(100% - 40px); padding: 9px 16px; border-radius: 14px;
-  background: rgba(14, 28, 42, 0.94); border: 1px solid rgba(255, 214, 138, 0.25);
-  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7);
-  font-size: 12.5px; line-height: 1.6; text-align: center; pointer-events: none;
-}
-
-/* 集めた光と、磨くボタン */
-.dock {
-  flex: none; position: relative;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 12px max(22px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(22px, env(safe-area-inset-left, 0px));
-  border-top: 1px solid var(--hair);
-  background: rgba(4, 10, 17, 0.4);
-}
-.bank { display: flex; flex-direction: column; min-width: 0; }
-.bank .label { margin-bottom: 2px; }
-.bank strong { font: 800 28px/1.05 var(--font-display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.bank .cps { margin-top: 3px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.polish {
-  position: relative; flex: none; width: 66px; height: 66px; border-radius: 50%; border: 0; cursor: pointer;
-  display: grid; place-items: center; align-content: center; color: var(--lamp-ink);
-  background: radial-gradient(circle at 35% 28%, #fff6d6 0, var(--lamp) 40%, var(--lamp-deep) 100%);
-  box-shadow: 0 0 0 4px rgba(255, 214, 138, 0.12), 0 0 28px -4px rgba(255, 196, 110, 0.65);
-  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 0.08s;
-}
-.polish::before {
-  content: ""; position: absolute; inset: 5px; border-radius: 50%; pointer-events: none;
-  background: repeating-radial-gradient(circle at center, transparent 0 4px, rgba(120, 70, 10, 0.18) 4px 5px);
-}
-.polish:active { transform: scale(0.94); }
-.polish span { position: relative; font: 800 16px/1 var(--font-display); letter-spacing: 0.08em; }
-.polish small { position: relative; margin-top: 2px; font: 700 10.5px/1.2 var(--font-body); opacity: 0.75; font-variant-numeric: tabular-nums; }
+.welcome h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.welcome p { margin: 0; font-size: 15px; }
+.welcome strong { font-size: 38px; font-weight: 700; line-height: 1.2; }
+.welcome .note { margin: 2px 0 8px; }
 
 /* 広告を見て追い風をもらう画面 */
 .rewardAdBody {
   display: flex; justify-content: center; align-items: flex-start;
-  width: 100%; max-height: 250px; overflow: hidden;
-  border-radius: 10px; background: #fff;
+  width: 100%; max-height: 250px; overflow: hidden; background: #fff;
 }
 .rewardAdBody iframe { display: block; width: 300px; max-width: 100%; height: 250px; border: 0; }
 .adlayer {
   position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
   padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
-  background: rgba(5, 12, 20, 0.88);
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  background: rgba(51, 38, 31, 0.82);
 }
 .adbox {
-  width: min(100%, 380px); padding: 22px 20px; border: 1px solid var(--hair); border-radius: 20px;
-  background: #0f2232; display: flex; flex-direction: column; gap: 12px; text-align: center;
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+  width: min(100%, 380px); padding: 18px 16px; border: 2.5px solid var(--ink-b);
+  background: var(--grain), var(--paper); color: var(--ink-b);
+  display: flex; flex-direction: column; gap: 10px; text-align: center;
 }
-.adtag { margin: 0; font-size: 10.5px; letter-spacing: 0.18em; color: var(--faint); }
-.adbox h2 { margin: 0; font: 800 18px/1.4 var(--font-display); letter-spacing: 0.06em; }
-.adsub { margin: 0; font-size: 12.5px; color: var(--muted); }
-.adbar { height: 3px; border-radius: 2px; background: rgba(143, 167, 184, 0.14); overflow: hidden; }
-.adbar i { display: block; height: 100%; width: 0; background: var(--lamp); }
-.adbtns { display: flex; flex-direction: column; gap: 8px; }
-.adgo { min-height: 46px; border: 0; border-radius: 999px; background: var(--lamp); color: var(--lamp-ink); font-weight: 700; font-size: 14px; letter-spacing: 0.06em; cursor: pointer; }
-.adgo:disabled { background: rgba(143, 167, 184, 0.14); color: var(--muted); cursor: default; }
-.adbtns .linkbtn { align-self: center; min-height: 36px; padding: 0 18px; }
+.adtag { margin: 0; font-size: 13px; font-weight: 700; }
+.adbox h2 { margin: 0; font: 700 18px/1.4 var(--font-display); }
+.adsub { margin: 0; font-size: 15px; }
+.adbar { height: 6px; border: 2px solid var(--ink-b); overflow: hidden; }
+.adbar i { display: block; height: 100%; width: 0; background: var(--ink-b); }
+.adbtns { display: flex; flex-direction: column; gap: 6px; }
+.adgo { min-height: 52px; border: 0; border-radius: 0; background: var(--teal); color: var(--on); font-weight: 700; font-size: 16px; cursor: pointer; }
+.adgo:disabled { background: transparent; color: var(--ink-b); border: 2.5px solid var(--ink-b); cursor: default; }
+.adbtns .linkbtn { align-self: center; }
 
 /* 背の低い画面では、手帳の上下を詰めて中身を多く見せる */
 @media (max-height: 740px) {
-  .sheet-head { padding-top: 12px; padding-bottom: 6px; }
-  .dock { padding-top: 9px; padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px)); }
-  .bank strong { font-size: 24px; }
-  .polish { width: 58px; height: 58px; }
-  .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .bank strong { font-size: 32px; }
+  .polish { width: 84px; height: 84px; }
 }
 /* 横向きなど高さが足りないときは、手帳を少し高めから始める */
 @media (max-height: 560px) {
@@ -347,9 +380,10 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .guide { animation: none; }
-  .polish { transition: none; }
-  .row.bought { animation: none; }
+  .rank-news { animation: none; }
+  .gain.show { animation: none; opacity: 1; }
+  .row.bought .price, .row.shake .price { animation: none; }
+  .polish, .polish * { transition: none !important; animation: none !important; }
 }
 </style>
 </head>
@@ -357,43 +391,58 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
 <section class="scene" aria-label="夕暮れの岬">
   <canvas id="sea" aria-label="灯台のある夕暮れの海。灯りや塔をタップすると光が集まり、金色に光る船をタップすると導けます"></canvas>
 </section>
-<button class="bgm" id="bgmBtn" type="button" aria-pressed="false" aria-label="ローファイのBGMを再生する">
-  <span aria-hidden="true">♪</span>
-</button>
-
 <main class="sheet" id="sheet" aria-label="灯台守の手帳">
+  <h1 class="vh">灯りの岬</h1>
   <header class="sheet-head">
-    <h1>灯りの岬</h1>
+    <div class="rank-news" id="rankNews" role="status" hidden><small>灯台の格が上がった</small><b id="rankNewsName"></b></div>
     <button class="rank" id="rankBtn" type="button" aria-label="いまの灯台の格について">
-      <span class="rank-name" id="rankName">港の常夜灯</span>
-      <span class="range">光達距離 <b id="rangeVal">3.0</b> 海里</span>
+      <b id="rankName">港の常夜灯</b>
+      <span class="steps" id="rankSteps" role="img" aria-label="次の格まで"></span>
+    </button>
+    <button class="icon" id="bgmBtn" type="button" data-on="true" aria-expanded="false" aria-controls="sndPanel" aria-label="音の切り替え">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4z"/><path class="wave" d="M15.5 9.2c1.1 1.6 1.1 4 0 5.6M18.2 6.8c2.4 3 2.4 7.4 0 10.4"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+    </button>
+    <button class="icon" id="menuBtn" type="button" aria-label="手帳のメニュー（図鑑・言い伝え・記録）" aria-expanded="false" aria-controls="menuPage">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6.5a2 2 0 0 1 1.5.7A2 2 0 0 1 13.5 5H20v14h-6.5a1.5 1.5 0 0 0-1.5 1.2A1.5 1.5 0 0 0 10.5 19H4z"/><path d="M12 6v13"/></svg>
     </button>
   </header>
 
+  <div class="snd-panel" id="sndPanel" hidden>
+    <button class="sw" id="sndAmb" type="button" aria-pressed="false">環境音（波と風）</button>
+    <button class="sw" id="sndSfx" type="button" aria-pressed="true">効果音</button>
+  </div>
+
+  <div class="act">
+    <div class="bank">
+      <span class="vh">集めた光</span>
+      <strong id="light" class="num">0</strong>
+      <span class="gain num" id="gainFx" aria-hidden="true"></span>
+      <span class="cps num" id="cps">毎秒 0</span>
+    </div>
+    <button class="polish" id="polish" type="button" aria-label="灯りを磨く">
+      <i class="ghost" aria-hidden="true"></i><i class="plate" aria-hidden="true"></i><i class="ink" aria-hidden="true"></i>
+      <span>磨く</span><small id="tapGain" class="num">+1</small>
+    </button>
+  </div>
+
+  <div class="call" id="guide" hidden>
+    <span id="guideText">金の船が通ります</span>
+    <button class="call-btn" id="guideBtn" type="button">導く</button>
+  </div>
+  <section class="goal" id="goal" aria-label="次の目標">
+    <span>次は</span><b id="goalName">石油ランプ</b><span class="goal-left num" id="goalLeft">あと 15 光</span>
+  </section>
+
   <div class="sheet-body" id="sheetBody">
-    <button class="guide" id="guide" type="button" hidden>信号船を導く</button>
 
-    <p class="hint" id="hint">灯りか塔をタップして光を集めよう。金色に光る船が通ったら、タップして岬へ導こう。</p>
 
-    <section class="goal" id="goal" aria-label="次の目標">
-      <div class="goal-line">
-        <span class="goal-label">次の目標</span>
-        <b id="goalName">石油ランプ</b>
-        <span class="goal-left" id="goalLeft">あと 15 光</span>
-      </div>
-      <div class="goal-bar"><i id="goalFill"></i></div>
-    </section>
-
-    <section class="boost" id="boost" aria-label="追い風" hidden>
-      <div class="boost-text">
-        <b id="boostTitle">追い風を呼ぶ</b>
-        <span id="boostSub">広告を見ると、3分間 光が2倍になります。</span>
-      </div>
-      <button class="boost-btn" id="boostBtn" type="button">広告を見る</button>
-    </section>
+    <button class="boost" id="boostBtn" type="button" hidden>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 9h11a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 19h7"/></svg>
+      <b id="boostTitle">追い風を呼ぶ</b><span id="boostSub" class="num">3分間 光×2</span><em id="boostTag">広告</em>
+    </button>
 
     <section class="shop" aria-label="岬の備え">
-      <div class="tabs" role="tablist">
+      <div class="tabs" id="tabs" role="tablist">
         <button class="tab" id="tabGen" role="tab" aria-selected="true" aria-controls="genList" type="button">設備</button>
         <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/17</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
         <div class="qty" id="qty" role="group" aria-label="まとめ買い">
@@ -406,21 +455,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       <div class="list" id="upList" role="tabpanel" aria-labelledby="tabUp" hidden></div>
     </section>
 
-    <section class="zukan" aria-label="岬の生き物">
-      <div class="zukan-head">
-        <span class="label">岬の生き物</span>
-        <span class="zukan-sum" id="zukanSum">0/4</span>
-      </div>
-      <ul class="zukan-list" id="zukanList"></ul>
-      <p class="zukan-note">岬のどこかに、ときどき生き物が顔を出します。初めて出会うたびに、光の産出がずっと +5% になります。</p>
-    </section>
-
-    <details class="legend">
-      <summary>岬の言い伝え</summary>
-      <p>この岬には、小さな灯りがひとつあるだけだった。ある晩、通りかかった船が岩場で立ち往生し、岬に住む誰かがランプを掲げて一晩中それを照らし続けた。船は朝まで無事に持ちこたえ、それから岬には灯台守が置かれるようになった。代々の灯台守は鏡を磨き、歯車を巻き、やがて電気を引いて、光をどこまでも遠くへ届けてきた。「灯りの岬」という名は、その最初の晩に由来する。あなたは、その灯りを受け継いだ最新の灯台守だ。</p>
-    </details>
-
-    <aside class="adslot" aria-label="広告">
+    <aside class="adslot" id="adBox" aria-label="広告">
       <span class="adslot-tag">広告</span>
       <div class="adslot-body" id="adSlot">
         <!-- 広告タグの貼り付け場所: AD_TAG_START と AD_TAG_END の間を、広告サービスのタグに置き換えてください -->
@@ -432,13 +467,47 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       </div>
     </aside>
 
-    <footer class="foot">
-      <dl class="stats">
-        <div><dt>導いた船</dt><dd id="stGuided">0隻</dd></div>
-        <div><dt>磨いた回数</dt><dd id="stTaps">0回</dd></div>
-        <div><dt>集めた光の合計</dt><dd id="stTotal">0</dd></div>
-      </dl>
-      <p class="note">進み具合はこの端末のブラウザに自動で保存されます。ページを閉じているあいだも、最大8時間まで半分の量で光が貯まります。</p>
+  </div>
+
+  <section class="page" id="menuPage" role="dialog" aria-modal="false" aria-labelledby="menuTitle" hidden>
+    <header class="page-head">
+      <h2 id="menuTitle">灯台守の手帳</h2>
+      <button class="close" id="menuClose" type="button">閉じる</button>
+    </header>
+    <div class="page-body">
+      <section aria-labelledby="zkTitle">
+        <h3 id="zkTitle">岬の生き物</h3>
+        <p class="lead num" id="zukanSum">4種のうち0種</p>
+        <ul class="zukan-list" id="zukanList"></ul>
+        <p class="note">岬のどこかに、ときどき生き物が顔を出します。初めて出会うたびに、光の産出がずっと +5% になります。</p>
+      </section>
+      <section aria-labelledby="lgTitle">
+        <h3 id="lgTitle">岬の言い伝え</h3>
+        <p class="legend-text">この岬には、小さな灯りがひとつあるだけだった。ある晩、通りかかった船が岩場で立ち往生し、岬に住む誰かがランプを掲げて一晩中それを照らし続けた。船は朝まで無事に持ちこたえ、それから岬には灯台守が置かれるようになった。代々の灯台守は鏡を磨き、歯車を巻き、やがて電気を引いて、光をどこまでも遠くへ届けてきた。「灯りの岬」という名は、その最初の晩に由来する。あなたは、その灯りを受け継いだ最新の灯台守だ。</p>
+      </section>
+      <section aria-labelledby="rcTitle">
+        <h3 id="rcTitle">記録</h3>
+        <dl class="stats">
+          <div><dt>導いた船</dt><dd id="stGuided" class="num">0隻</dd></div>
+          <div><dt>磨いた回数</dt><dd id="stTaps" class="num">0回</dd></div>
+          <div><dt>集めた光の合計</dt><dd id="stTotal" class="num">0</dd></div>
+          <div><dt>光達距離</dt><dd id="stRange" class="num">3.0 海里</dd></div>
+        </dl>
+      </section>
+      <section aria-labelledby="sdTitle">
+        <h3 id="sdTitle">音</h3>
+        <div class="sw-list">
+          <button class="sw" id="sndAmb2" type="button" aria-pressed="false">環境音（波と風）</button>
+          <button class="sw" id="sndSfx2" type="button" aria-pressed="true">効果音</button>
+        </div>
+      </section>
+      <section aria-labelledby="tuTitle">
+        <h3 id="tuTitle">案内</h3>
+        <button class="linkbtn" id="tutReplay" type="button">はじめの案内をもう一度見る</button>
+      </section>
+      <section aria-labelledby="svTitle">
+        <h3 id="svTitle">保存について</h3>
+        <p class="note">進み具合はこの端末のブラウザに自動で保存されます。ページを閉じているあいだも、最大8時間まで半分の量で光が貯まります。</p>
       <div class="reset">
         <button class="linkbtn" id="resetBtn" type="button">最初からやり直す</button>
         <span id="resetAsk" hidden>保存を消して最初から始めます。
@@ -446,22 +515,32 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
           <button class="linkbtn" id="resetNo" type="button">やめる</button>
         </span>
       </div>
-    </footer>
-  </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="welcome" id="welcome" role="dialog" aria-labelledby="welcomeTitle" hidden>
+    <h2 id="welcomeTitle">おかえりなさい</h2>
+    <p>留守のあいだに集まった光</p>
+    <strong class="num" id="welcomeNum">0</strong>
+    <p class="note">ページを閉じているあいだも、半分の量で光が貯まります（最大8時間）。</p>
+    <button class="call-btn" id="welcomeOk" type="button">受け取る</button>
+  </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <div class="dock">
-    <div class="bank">
-      <span class="label">集めた光</span>
-      <strong id="light">0</strong>
-      <span class="cps" id="cps">毎秒 0</span>
-    </div>
-    <button class="polish" id="polish" type="button" aria-label="灯りを磨く">
-      <span>磨く</span><small id="tapGain">+1</small>
-    </button>
-  </div>
 </main>
+
+<div class="coach" id="coach" hidden>
+  <div class="coach-hole" id="coachHole" aria-hidden="true"></div>
+  <div class="coach-tip" id="coachTip" role="status">
+    <p id="coachText"></p>
+    <div class="coach-btns">
+      <button class="linkbtn" id="coachNext" type="button" hidden>次へ</button>
+      <button class="linkbtn" id="coachSkip" type="button">とばす</button>
+    </div>
+  </div>
+</div>
 
 <div class="adlayer" id="adLayer" role="dialog" aria-modal="true" aria-labelledby="adTitle" hidden>
   <div class="adbox">
@@ -538,11 +617,32 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
   var state = null;
   var qty = 1;
   var W = 0, H = 0, VH = 0, dpr = 1, horizon = 0, lampX = 0, lampY = 0; // VH = 手帳の上端までの「景色の高さ」
-  var ships = [], floaters = [], stars = [], bonus = null;
+  var ships = [], stars = [], bonus = null;
   var nextBonus = 10, ambientTimer = 1, pulse = 0, theta = 0, rangeNow = 3;
   var creature = null, nextCreature = 35 + Math.random() * 35;
   // 景色の成長: 灯台の高さ(格に合わせて伸びる)、格上げの光、霧、衛星
   var towerGrow = 0, rankFlash = 0;
+  // 手触り：磨くと光線が一瞬伸び（beamKick）、灯りから光の粒（sparks）が舞う
+  var beamKick = 0, sparks = [], rankFx = 0;
+  // 買ったとき：景色のその設備のあたりに、刷った光の輪がひろがる
+  var buyRings = [], ripples = [];
+  function equipSpot(id) {
+    var off = towerOff();
+    switch (id) {
+      case 'lamp': return { x: W * 0.25, y: islandTopY(0.25) - 8 };
+      case 'keeper': return { x: W * 0.355, y: islandTopY(0.355) - VH * 0.04 };
+      case 'horn': return { x: lampX + W * 0.05, y: VH * 0.32 + off };
+      case 'plant': return { x: W * 0.88, y: VH * 0.92 };
+      case 'wind': return { x: W * 0.86, y: horizon - VH * 0.06 };
+      case 'satellite': return { x: W * 0.5, y: horizon * 0.22 };
+      default: return { x: lampX, y: lampY };   // 反射鏡・回転機構・フレネルレンズは灯室
+    }
+  }
+  function ringAt(id) {
+    if (reduce) return;
+    var p = equipSpot(id);
+    buyRings.push({ x: p.x, y: p.y, age: 0 });
+  }
   var fog = 0, fogTarget = 0, fogTimer = 70 + Math.random() * 60, fogLeft = 0;
   var satT = Math.random() * 60;
 
@@ -580,6 +680,170 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     return { from: DAY_PHASES[i], to: DAY_PHASES[j], t: e };
   }
   function goldenActive() { var m = dayT % DAY_CYCLE_SEC; return m >= GOLDEN_FROM && m < GOLDEN_TO; }
+
+  // ---------- 案内（チュートリアル） ----------
+  // 1つやって、1つ分かる。対象のまわりだけ明るく残し、吹き出しは手帳の中に一言だけ。
+  var TUT_HINT_IDS = ['up', 'qty', 'kind', 'fog', 'golden', 'boost'];
+  var coachNow = null, coachShownAt = 0;
+  function firstUpPrice() { var k = Object.keys(upEls)[0]; return k ? upEls[k].price : null; }
+  var TUT_CORE = [
+    { id: 'polish', el: 'polish', round: true, text: '灯りを磨いて、光を集める',
+      done: function () { return state.light >= 15 || state.owned.lamp > 0; } },
+    { id: 'buy', el: function () { return genEls.lamp && genEls.lamp.price; }, text: '光がたまった。石油ランプを灯す',
+      done: function () { return state.owned.lamp > 0; } },
+    { id: 'cps', el: 'cps', text: 'これで、ひとりでに光が貯まっていく', auto: 4500 },
+    { id: 'tab', el: 'tabUp', text: '「強化」に、道具が並んだ',
+      wait: function () { return state.ui.up && !$('tabUp').hidden; },
+      done: function () { return upList.hidden === false || UPS.some(function (u) { return state.ups[u.id]; }); } },
+    { id: 'up', el: firstUpPrice, text: '道具を買うと、磨く力が上がる',
+      wait: function () { return upList.hidden === false && !!firstUpPrice(); },
+      done: function () { return UPS.some(function (u) { return state.ups[u.id]; }); } },
+    { id: 'away', el: null, text: '閉じても光は貯まる（半分・最大8時間）', auto: 6500 }
+  ];
+  var TUT_SHIP = { id: 'ship', point: function () { return bonus && !bonus.done ? { x: bonus.x, y: bonus.y0 - 10 * bonus.sc, r: 30 } : null; },
+    text: '金の船を岬へ導く。船か「導く」を押す' };
+  var TUT_HINTS = [
+    { id: 'kind', when: function () { return creature && creature.age > 0.6 && creature.y0 != null; },
+      point: function () { return creature && creature.y0 != null ? { x: creature.x, y: creature.y0, r: 28 } : null; },
+      text: '岬の生き物。そっと触れてみる', until: function () { return !creature; } },
+    { id: 'qty', when: function () { return state.ui.qty && !$('qty').hidden; }, el: 'qty', text: 'まとめて買える（×10・最大）', auto: 5000 },
+    { id: 'boost', when: function () { return !$('boostBtn').hidden && !(state.boostUntil > Date.now()); }, el: 'boostBtn', text: '広告を見ると、3分間 光×2', auto: 5000 },
+    { id: 'golden', when: function () { return goldenActive(); }, el: 'cps', text: '凪の恵み：しばらく光×1.5', auto: 5000 },
+    { id: 'fog', when: function () { return fog > 0.3; }, el: null, text: '霧笛が鳴った。霧の中の船に岬を知らせる', auto: 5000 }
+  ];
+  function coachEl(spec) {
+    if (!spec.el) return null;
+    var e = typeof spec.el === 'function' ? spec.el() : $(spec.el);
+    return e && e.offsetParent ? e : null;
+  }
+  function coachClose(markDone) {
+    if (!coachNow) return;
+    var c = coachNow;
+    coachNow = null;
+    $('coach').hidden = true;
+    if (markDone) {
+      if (c.kind === 'core') state.tut.core = c.index + 1 >= TUT_CORE.length ? 99 : c.index + 1;
+      else if (c.kind === 'ship') state.tut.ship = 1;
+      else state.tut.seen[c.spec.id] = 1;
+      save();
+    }
+  }
+  function coachOpen(kind, spec, index) {
+    coachNow = { kind: kind, spec: spec, index: index || 0 };
+    coachShownAt = Date.now();
+    $('coachText').textContent = spec.text;
+    $('coachNext').hidden = !(state.tut.replay || spec.auto);
+    $('coachNext').textContent = spec.auto && !state.tut.replay ? 'わかった' : '次へ';
+    $('coachSkip').hidden = !!(spec.auto && !state.tut.replay);
+    $('coach').hidden = false;
+    placeCoach();
+  }
+  function placeCoach() {
+    if (!coachNow) return;
+    var spec = coachNow.spec, hole = $('coachHole'), tip = $('coachTip');
+    var sheetTop = $('sheet').getBoundingClientRect().top + 8, rect = null, round = !!spec.round;
+    var el = coachEl(spec);
+    if (el) {
+      var r = el.getBoundingClientRect(), pad = round ? 4 : 6;
+      rect = { left: r.left - pad, top: r.top - pad, width: r.width + pad * 2, height: r.height + pad * 2 };
+    } else if (spec.point) {
+      var pt = spec.point();
+      if (pt) { var cr = cv.getBoundingClientRect(); rect = { left: cr.left + pt.x - pt.r, top: cr.top + pt.y - pt.r, width: pt.r * 2, height: pt.r * 2 }; round = true; }
+    }
+    hole.hidden = !rect;
+    tip.classList.remove('above', 'below', 'free');
+    var th = tip.offsetHeight || 60, top;
+    if (rect) {
+      hole.classList.toggle('round', round);
+      hole.style.left = rect.left + 'px'; hole.style.top = rect.top + 'px';
+      hole.style.width = rect.width + 'px'; hole.style.height = rect.height + 'px';
+      var cx = rect.left + rect.width / 2;
+      if (rect.top < sheetTop) {
+        top = sheetTop; tip.classList.add('below');            // 景色の中のもの：吹き出しは手帳の上端に
+      } else if (rect.top + rect.height + 14 + th < window.innerHeight - 8) {
+        top = rect.top + rect.height + 14; tip.classList.add('below');
+      } else {
+        top = Math.max(sheetTop, rect.top - th - 14); tip.classList.add('above');
+      }
+      var tr = tip.getBoundingClientRect();
+      tip.style.setProperty('--ax', Math.max(18, Math.min(tr.width - 18, cx - (tr.left || 16))) + 'px');
+    } else {
+      top = sheetTop + 52; tip.classList.add('free');
+    }
+    tip.style.top = top + 'px';
+  }
+  function tutorialTick() {
+    if (!state || !state.tut) return;
+    var t = state.tut;
+    // いま出ている案内を閉じるか
+    if (coachNow) {
+      var c = coachNow, sp = c.spec, age = Date.now() - coachShownAt;
+      if (c.kind === 'ship') { if (state.guided > 0 || !bonus || bonus.done) coachClose(state.guided > 0); return; }
+      if (sp.until && sp.until()) { coachClose(true); return; }
+      if (!t.replay && sp.done && sp.done()) { coachClose(true); return; }
+      if (sp.auto && !t.replay && age > sp.auto) { coachClose(true); return; }
+      if ((sp.el || sp.point) && !coachEl(sp) && !(sp.point && sp.point())) { coachClose(false); return; }
+      return;
+    }
+    if (!$('adLayer').hidden || !$('menuPage').hidden || !$('welcome').hidden) return;
+    // 金の船は、来たときに割り込む（出てくる間隔は変えない）
+    if (!t.ship && state.guided === 0 && bonus && !bonus.done && bonus.x > 20 && bonus.x < W - 20) { coachOpen('ship', TUT_SHIP); return; }
+    if (t.core < 99) {
+      var step = TUT_CORE[t.core];
+      if (!step) { t.core = 99; return; }
+      if (!t.replay && step.done && step.done()) { t.core = t.core + 1 >= TUT_CORE.length ? 99 : t.core + 1; return; }
+      if (step.wait && !step.wait()) {
+        if (t.replay) t.core = t.core + 1 >= TUT_CORE.length ? 99 : t.core + 1;   // もう一度見るときは、出せない段をとばす
+        return;
+      }
+      if (step.el && !coachEl(step)) { if (t.replay) t.core++; return; }
+      coachOpen('core', step, t.core);
+      return;
+    }
+    if (t.replay) { t.replay = 0; save(); }
+    for (var i = 0; i < TUT_HINTS.length; i++) {
+      var h = TUT_HINTS[i];
+      if (!t.seen[h.id] && h.when()) { coachOpen('hint', h); return; }
+    }
+  }
+  // おかえり：留守のあいだの光を、数え上げて見せる
+  var welcomeTimer = 0;
+  function showWelcome(g) {
+    var el = $('welcomeNum'), t0 = Date.now(), dur = reduce ? 0 : 1200;
+    $('welcome').hidden = false;
+    clearInterval(welcomeTimer);
+    welcomeTimer = setInterval(function () {
+      var k = dur ? Math.min(1, (Date.now() - t0) / dur) : 1;
+      el.textContent = '+' + fmtNum(g * (1 - Math.pow(1 - k, 3)));
+      if (k >= 1) clearInterval(welcomeTimer);
+    }, 40);
+    setTimeout(function () { var b = $('welcomeOk'); if (b) b.focus(); }, 50);
+  }
+
+  // ---------- 時間帯で変わる手帳の色（押せるもの・紙） ----------
+  // 文字はどの時間帯も同じ（墨茶と白）。色は線形RGBで補間するので、途中の色も
+  // 両端と同じ明るさの範囲に収まり、文字とのコントラスト（4.5:1以上）が保たれる。
+  var ACCENT_COLORS = { night: '#8F5F12', dawn: '#8F5F12', day: '#C42A2A', dusk: '#B8492B' };
+  var PAPER_COLORS = { night: '#DADDE2', dawn: '#F1E1DA', day: '#F8F5EE', dusk: '#F2E4C8' };
+  function toLin(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  function fromLin(v) { v = Math.max(0, Math.min(1, v)); return Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)); }
+  function mixLinear(h1, h2, t) {
+    var a = hexRgb(h1), b = hexRgb(h2), out = [];
+    for (var i = 0; i < 3; i++) { var x = toLin(a[i]), y = toLin(b[i]); out.push(fromLin(x + (y - x) * t)); }
+    return 'rgb(' + out.join(',') + ')';
+  }
+  var lastTimeColors = '';
+  function applyTimeColors() {
+    var ph = dayBlend();
+    var acc = mixLinear(ACCENT_COLORS[ph.from], ACCENT_COLORS[ph.to], ph.t);
+    var pap = mixLinear(PAPER_COLORS[ph.from], PAPER_COLORS[ph.to], ph.t);
+    var sig = acc + pap;
+    if (sig === lastTimeColors) return;
+    lastTimeColors = sig;
+    var st = document.documentElement.style;
+    st.setProperty('--accent', acc);
+    st.setProperty('--paper', pap);
+  }
   var toastTimer = 0, upSig = null;
 
   // ---------- 数の表示(万・億・兆) ----------
@@ -604,7 +868,12 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     GENS.forEach(function (g) { owned[g.id] = 0; });
     var met = {};
     KINDS.forEach(function (k) { met[k.id] = 0; });
-    return { v: 1, light: 0, total: 0, taps: 0, guided: 0, found: 0, owned: owned, ups: {}, met: met, rank: 0, boostUntil: 0, seen: Date.now() };
+    // ui: 強化タブ(up)・まとめ買い(qty)を一度出したら 1（出したまま）。古いセーブに無いときはこの既定値で補う
+    return { v: 1, light: 0, total: 0, taps: 0, guided: 0, found: 0, owned: owned, ups: {}, met: met, rank: 0, boostUntil: 0, seen: Date.now(), ui: { up: 0, qty: 0 },
+      // tut: はじめの案内の段(core。99で終わり)、金の船の案内(ship)、初めて出る要素の一言を見たか(seen)
+      tut: { core: 0, ship: 0, seen: {} },
+      // snd: 環境音(bgm)と効果音(sfx)。はじめは効果音だけ鳴らす
+      snd: { bgm: 0, sfx: 1 } };
   }
   function sanitize(s) {
     if (!s || typeof s !== 'object') return null;
@@ -623,6 +892,29 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     });
     // 図鑑ができる前のセーブ: 見つけたタコの数を引き継ぐ
     if (!s.met && b.found > 0) b.met.octopus = b.found;
+    if (s.ui && typeof s.ui === 'object') {
+      ['up', 'qty'].forEach(function (k) { if (s.ui[k] === 1) b.ui[k] = 1; });
+    }
+    if (s.snd && typeof s.snd === 'object') {
+      if (s.snd.bgm === 1) b.snd.bgm = 1;
+      if (s.snd.sfx === 0) b.snd.sfx = 0;
+    }
+    if (s.tut && typeof s.tut === 'object') {
+      if (typeof s.tut.core === 'number' && isFinite(s.tut.core)) b.tut.core = Math.max(0, Math.min(99, Math.floor(s.tut.core)));
+      if (s.tut.ship === 1) b.tut.ship = 1;
+      if (s.tut.seen && typeof s.tut.seen === 'object') TUT_HINT_IDS.forEach(function (k) { if (s.tut.seen[k] === 1) b.tut.seen[k] = 1; });
+    } else if (b.total > 0) {
+      // 案内ができる前から遊んでいる人：はじめの流れは終わったものとし、もう経験した要素の一言も出さない
+      b.tut.core = 99;
+      if (b.guided > 0) b.tut.ship = 1;
+      var sum = 0; GENS.forEach(function (g) { sum += b.owned[g.id]; });
+      if (UPS.some(function (u) { return b.ups[u.id]; })) b.tut.seen.up = 1;
+      if (sum >= 10) b.tut.seen.qty = 1;
+      if (b.found > 0) b.tut.seen.kind = 1;
+      if (b.owned.horn > 0) b.tut.seen.fog = 1;
+      if (b.total >= 50) b.tut.seen.boost = 1;
+      if (b.taps > 0) b.tut.seen.golden = 1;
+    }
     return b;
   }
   function load() {
@@ -686,20 +978,69 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
   function gain(x) { state.light += x; state.total += x; }
 
   // ---------- 操作 ----------
-  function toast(msg, ms) {
-    var el = $('toast');
-    el.textContent = msg; el.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.hidden = true; }, ms || 3200);
+  // お知らせは1件ずつ順番に出す。大事なもの（格上げ・発見）は先に。同じ種類のものはまとめる。
+  var toastQ = [], toastNow = null;
+  function toast(msg, ms, pri, key) {
+    var item = { msg: msg, ms: Math.max(1800, Math.min(ms || 2600, 5000)), pri: pri || 1, key: key || '' };
+    if (item.key) {
+      if (toastNow && toastNow.key === item.key) { $('toast').textContent = msg; toastNow.msg = msg; return; }
+      toastQ = toastQ.filter(function (q) { return q.key !== item.key; });
+    }
+    var i = 0;
+    while (i < toastQ.length && toastQ[i].pri >= item.pri) i++;
+    toastQ.splice(i, 0, item);
+    pumpToast();
   }
-  function addFloater(x, y, text) { floaters.push({ x: x, y: y, text: text, age: 0 }); }
+  function pumpToast() {
+    if (toastNow || !toastQ.length) return;
+    var it = toastQ.shift(), el = $('toast');
+    toastNow = it;
+    el.textContent = it.msg; el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.hidden = true; toastNow = null;
+      setTimeout(pumpToast, 220);
+    }, it.ms);
+  }
+  // 「+N」は光の数のそばに。続けて磨くあいだは1つにまとめて足していく
+  var gainSum = 0, gainAt = 0;
+  function showGain(n) {
+    var el = $('gainFx'), now = Date.now();
+    gainSum = now - gainAt < 700 ? gainSum + n : n;
+    gainAt = now;
+    el.textContent = '+' + fmtNum(gainSum);
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
+  function placeCalls() {
+    // お知らせと船の呼びかけを、次の目標の行にぴったり重ねる
+    var g = $('goal'), sh = $('sheet');
+    sh.style.setProperty('--goal-top', g.offsetTop + 'px');
+    sh.style.setProperty('--goal-h', g.offsetHeight + 'px');
+  }
 
+  var pressTimer = 0;
+  function pressPolish() {
+    var b = $('polish');
+    if (!b) return;
+    b.classList.add('press');
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(function () { b.classList.remove('press'); }, 110);
+  }
   function polish() {
+    pressPolish();
     var p = tapPower();
     gain(p);
     state.taps++;
     pulse = 1;
-    addFloater(lampX + (Math.random() - 0.5) * 36, lampY - 16, '+' + fmtNum(p));
+    beamKick = Math.min(1, beamKick + 0.4);
+    if (!reduce) {
+      for (var i = 0; i < 3; i++) {
+        var a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, sp = 30 + Math.random() * 40;
+        sparks.push({ x: lampX, y: lampY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, age: 0, life: 0.6 + Math.random() * 0.3, r: 1.4 + Math.random() * 1.4 });
+      }
+      if (sparks.length > 60) sparks.splice(0, sparks.length - 60);
+    }
+    showGain(p);
     sfx('tap');
     renderAll();
   }
@@ -709,7 +1050,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     state.light -= p.cost;
     state.owned[id] += p.n;
     pulse = Math.max(pulse, 0.6);
-    sfx('buy'); flashRow(genEls[id] && genEls[id].row);
+    sfx('buy', { tier: GENS.indexOf(g) }); flashRow(genEls[id] && genEls[id].row); ringAt(id);
     renderAll(); save();
   }
   function buyUp(id) {
@@ -717,13 +1058,14 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     if (state.ups[id] || state.light < u.cost) return;
     state.light -= u.cost;
     state.ups[id] = true;
-    sfx('buy');
+    sfx('buy'); flashRow(upEls[id] && upEls[id].row); ringAt(UMAP[id].gen || 'mirror');
     renderAll(); save();
   }
   function flashRow(el) {
     if (!el) return;
     el.classList.remove('bought'); void el.offsetWidth; el.classList.add('bought');
   }
+
   function guide() {
     if (!bonus || bonus.done) return;
     bonus.done = true;
@@ -731,8 +1073,8 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     var reward = Math.max(100, cps() * 45);
     gain(reward);
     state.guided++;
-    addFloater(bonus.x, bonus.y - 30, '+' + fmtNum(reward));
-    toast('船を無事に導きました。光 +' + fmtNum(reward), 3600);
+    showGain(reward);
+    toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
     $('guide').hidden = true;
     renderAll(); save();
   }
@@ -740,14 +1082,31 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     var sec = Math.min(dt, 28800);
     var g = cpsBase() * sec * 0.5;
     if (g > 0) gain(g);
-    if (sec >= 60 && g >= 1) toast('留守のあいだに光が ' + fmtNum(g) + ' 集まりました', 6000);
+    if (sec >= 60 && g >= 1) showWelcome(g);
   }
 
   // ---------- 追い風(報酬型広告) ----------
   // リワード広告(広告を見て光2倍)を使うときだけ true にする。
   var REWARDED_ADS = true;
   var BOOST_MS = 3 * 60 * 1000, AD_SECONDS = 15;
-  var adTimer = 0, adOnReward = null;
+  var adTimer = 0, adOnReward = null, adCheckTimer = 0;
+  // 広告が使えるか：手帳のバナー広告が実際に描画されたら使える。読み込みに失敗したら5分は出さない。
+  var AD_CHECK_MS = 8000, AD_RETRY_MS = 5 * 60 * 1000;
+  var adReady = false, adFailUntil = 0;
+  function watchBannerAd() {
+    var slot = $('adSlot');
+    if (!slot) return;
+    function check() {
+      if (adReady) return;
+      // 広告タグが書き込んだ要素（iframe・画像・リンクなど）があれば、広告は届いている
+      if (slot.querySelector('iframe, img, a, ins, div, video, canvas')) { adReady = true; $('adBox').hidden = false; renderAll(); }
+    }
+    check();
+    if (window.MutationObserver) new MutationObserver(check).observe(slot, { childList: true, subtree: true });
+    // しばらく待っても何も届かなければ、空の枠は畳む（タグはそのまま残す）
+    setTimeout(function () { if (!adReady) $('adBox').hidden = true; }, 10000);
+  }
+  function adUsable() { return adReady && navigator.onLine !== false && Date.now() >= adFailUntil; }
   // 忍者AdMaxの広告タグ(この「広告を見る」ボタン専用、300x250で作成)。広告を見るたびに読み込み直す。
   var REWARD_AD_TAG_SRC = 'https://adm.shinobi.jp/s/ed16ad69ab02a6f748812ab596479a7b';
 
@@ -759,7 +1118,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
   }
   function startBoost() {
     state.boostUntil = Date.now() + BOOST_MS;
-    toast('追い風が吹いています。3分間、光が2倍になります。', 4200);
+    toast('追い風が吹いた。3分間 光×2', 3200, 2, 'boost');
     renderAll(); save();
   }
 
@@ -783,6 +1142,23 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       '</head><body><script src="' + REWARD_AD_TAG_SRC + '"><' + '/script></body></html>'
     );
     doc.close();
+    // 読み込みに失敗したら（タグの取得エラー、または時間内に広告が出てこない）、報酬なしで閉じる
+    var tag = doc.querySelector('script');
+    if (tag) tag.addEventListener('error', function () { rewardAdFailed(); });
+    clearTimeout(adCheckTimer);
+    adCheckTimer = setTimeout(function () {
+      var d = null;
+      try { d = iframe.contentWindow && iframe.contentWindow.document; } catch (e) { d = null; }
+      // 別の場所から広告が差し込まれて中が読めない場合は、出ているものとして扱う
+      if (d && d.body && !d.body.querySelector('iframe, img, a, ins, div, video, canvas')) rewardAdFailed();
+    }, AD_CHECK_MS);
+  }
+  function rewardAdFailed() {
+    if ($('adLayer').hidden) return;
+    adFailUntil = Date.now() + AD_RETRY_MS;
+    closeAd(false);
+    toast('広告を読み込めなかった。少しあとでまた', 3200, 2, 'adfail');
+    renderAll();
   }
 
   // 広告を見終わる(＝待ち終わる)と onReward() を呼ぶ。広告そのもののクリックは求めない。
@@ -806,7 +1182,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     }, 100);
   }
   function closeAd(rewarded) {
-    clearInterval(adTimer);
+    clearInterval(adTimer); clearTimeout(adCheckTimer);
     $('adLayer').hidden = true;
     $('rewardAdBody').innerHTML = '';
     var cb = adOnReward;
@@ -814,183 +1190,218 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     if (rewarded && cb) cb();
   }
   function renderBoost() {
-    var box = $('boost'), on = state.boostUntil - Date.now() > 0;
-    var show = REWARDED_ADS && (state.total >= 50 || on);
-    box.hidden = !show;
+    var b = $('boostBtn'), on = state.boostUntil - Date.now() > 0;
+    // 吹いている間は見せ続ける。呼ぶボタンは、累計50光を超え、広告が使えるときだけ
+    var show = REWARDED_ADS && (on || (state.total >= 50 && adUsable()));
+    b.hidden = !show;
     if (!show) return;
-    box.dataset.on = on ? 'true' : 'false';
-    $('boostTitle').textContent = on ? '追い風 光2倍' : '追い風を呼ぶ';
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-disabled', on ? 'true' : 'false');
     if (on) {
       var s = Math.ceil((state.boostUntil - Date.now()) / 1000);
+      $('boostTitle').textContent = '追い風が吹いている';
       $('boostSub').textContent = '残り ' + Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+      $('boostTag').textContent = '光×2';
     } else {
-      $('boostSub').textContent = '広告を見ると、3分間 光が2倍になります。';
+      $('boostTitle').textContent = '追い風を呼ぶ';
+      $('boostSub').textContent = '3分間 光×2';
+      $('boostTag').textContent = '広告';
     }
-    var b = $('boostBtn');
-    b.disabled = on;
-    b.textContent = on ? '適用中' : '広告を見る';
+    b.setAttribute('aria-label', on ? '追い風が吹いている。' + $('boostSub').textContent : '広告を見て追い風を呼ぶ（3分間 光が2倍）');
   }
 
-  // ---------- BGM(ローファイ、すべてその場で合成) ----------
-  var NOTE_FREQ = {
-    C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
-    C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88
-  };
-  var BGM_CHORDS = [
-    ['F3', 'A3', 'C4', 'E4'],
-    ['E3', 'G3', 'B3', 'D4'],
-    ['D3', 'F3', 'A3', 'C4'],
-    ['C3', 'E3', 'G3', 'B3']
-  ];
-  var BAR_SEC = 3.2; // 4拍 x 0.8秒、ゆったり75前後のテンポ
-  var bgmOn = false, bgmCtx = null, bgmMaster = null, bgmSchedTimer = null;
-  var bgmNextTime = 0, bgmBarIndex = 0;
-
-  function bgmNoiseBuffer(ctx, sec) {
-    var buf = ctx.createBuffer(1, Math.round(ctx.sampleRate * sec), ctx.sampleRate);
-    var d = buf.getChannelData(0);
-    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  // ---------- 音（すべてその場で合成。音のファイルは使わない） ----------
+  // 環境音（波と風、ときどき遠い鐘・汽笛・木のきしみ）と効果音は、別々に切り替えられる。
+  // 音色はノイズとフィルターと音量の山で作り、鳴らすたびに高さや長さを少しゆらす。
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var actx = null, master = null, ambBus = null, sfxBus = null, verb = null, verbSend = null, noiseBuf = null, brownBuf = null;
+  var ambNodes = null, ambTimer = 0, nextWave = 0, nextEvent = 0, lastTapSfx = 0, tapCount = 0;
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function makeNoise(sec, brown) {
+    var buf = actx.createBuffer(1, Math.round(actx.sampleRate * sec), actx.sampleRate), d = buf.getChannelData(0), last = 0;
+    for (var i = 0; i < d.length; i++) {
+      var w = Math.random() * 2 - 1;
+      if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w;
+    }
     return buf;
   }
-  function bgmPad(freq, t, dur, pan) {
-    var ctx = bgmCtx;
-    var osc1 = ctx.createOscillator(), osc2 = ctx.createOscillator();
-    var filt = ctx.createBiquadFilter(), g = ctx.createGain(), p = ctx.createStereoPanner();
-    osc1.type = 'triangle'; osc2.type = 'sine';
-    osc1.frequency.value = freq; osc2.frequency.value = freq * 1.004; // わずかにデチューンして厚みを出す
-    filt.type = 'lowpass'; filt.frequency.value = 950; filt.Q.value = 0.3;
-    p.pan.value = pan;
-    var peak = 0.09;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(peak, t + 0.7);
-    g.gain.setValueAtTime(peak, t + dur - 0.9);
-    g.gain.linearRampToValueAtTime(0, t + dur);
-    osc1.connect(filt); osc2.connect(filt); filt.connect(g); g.connect(p); p.connect(bgmMaster);
-    osc1.start(t); osc2.start(t); osc1.stop(t + dur + 0.05); osc2.stop(t + dur + 0.05);
+  function audioReady() {
+    if (actx) { if (actx.state === 'suspended' && !document.hidden) { try { actx.resume(); } catch (e) {} } return true; }
+    if (!AC) return false;
+    try { actx = new AC(); } catch (e) { actx = null; return false; }
+    master = actx.createGain(); master.gain.value = 0.85; master.connect(actx.destination);
+    ambBus = actx.createGain(); ambBus.gain.value = 0; ambBus.connect(master);
+    sfxBus = actx.createGain(); sfxBus.gain.value = 0.6; sfxBus.connect(master);
+    // 残響：ゆっくり減っていくノイズから作った響き（海辺の空気）
+    verb = actx.createConvolver();
+    var len = Math.round(actx.sampleRate * 2.6), ir = actx.createBuffer(2, len, actx.sampleRate);
+    for (var ch = 0; ch < 2; ch++) { var d = ir.getChannelData(ch); for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+    verb.buffer = ir;
+    verbSend = actx.createGain(); verbSend.gain.value = 0.5; verbSend.connect(verb); verb.connect(master);
+    noiseBuf = makeNoise(2, false); brownBuf = makeNoise(4, true);
+    return true;
   }
-  function bgmKick(t) {
-    var ctx = bgmCtx;
-    var osc = ctx.createOscillator(), g = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(110, t);
-    osc.frequency.exponentialRampToValueAtTime(42, t + 0.22);
-    g.gain.setValueAtTime(0.5, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
-    osc.connect(g); g.connect(bgmMaster);
-    osc.start(t); osc.stop(t + 0.34);
-  }
-  function bgmHat(t) {
-    var ctx = bgmCtx;
-    var src = ctx.createBufferSource();
-    src.buffer = bgmCtx._hatBuf || (bgmCtx._hatBuf = bgmNoiseBuffer(ctx, 0.08));
-    var filt = ctx.createBiquadFilter(), g = ctx.createGain();
-    filt.type = 'highpass'; filt.frequency.value = 6500;
-    g.gain.setValueAtTime(0.045, t);
-    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.06);
-    src.connect(filt); filt.connect(g); g.connect(bgmMaster);
-    src.start(t); src.stop(t + 0.07);
-  }
-  function bgmScheduleBar(idx, t) {
-    var chord = BGM_CHORDS[idx % BGM_CHORDS.length];
-    var pans = [-0.25, -0.08, 0.08, 0.25];
-    chord.forEach(function (note, i) { bgmPad(NOTE_FREQ[note], t, BAR_SEC, pans[i % pans.length]); });
-    bgmKick(t);
-    bgmHat(t + 0.8); bgmHat(t + 1.6); bgmHat(t + 2.4);
-  }
-  function bgmScheduler() {
-    while (bgmNextTime < bgmCtx.currentTime + 0.15) {
-      bgmScheduleBar(bgmBarIndex, bgmNextTime);
-      bgmNextTime += BAR_SEC;
-      bgmBarIndex++;
-    }
-  }
-  function bgmStartCrackle() {
-    var ctx = bgmCtx;
-    var src = ctx.createBufferSource();
-    src.buffer = bgmNoiseBuffer(ctx, 4);
-    src.loop = true;
-    var filt = ctx.createBiquadFilter(), g = ctx.createGain();
-    filt.type = 'highpass'; filt.frequency.value = 2200;
-    g.gain.value = 0.012;
-    src.connect(filt); filt.connect(g); g.connect(bgmMaster);
-    src.start();
-  }
-  function bgmEnsure() {
-    if (bgmCtx) return;
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    bgmCtx = new AC();
-    bgmMaster = bgmCtx.createGain();
-    bgmMaster.gain.value = 0;
-    bgmMaster.connect(bgmCtx.destination);
-    bgmStartCrackle();
-  }
-  function toggleBgm() {
-    bgmEnsure();
-    if (!bgmCtx) { toast('この端末ではBGMを再生できません。', 2600); return; }
-    bgmOn = !bgmOn;
-    $('bgmBtn').setAttribute('aria-pressed', bgmOn ? 'true' : 'false');
-    if (bgmOn) {
-      if (bgmCtx.state === 'suspended') bgmCtx.resume();
-      bgmNextTime = bgmCtx.currentTime + 0.05;
-      bgmBarIndex = 0;
-      bgmScheduler();
-      bgmSchedTimer = setInterval(bgmScheduler, 100);
-      bgmMaster.gain.cancelScheduledValues(bgmCtx.currentTime);
-      bgmMaster.gain.linearRampToValueAtTime(0.55, bgmCtx.currentTime + 0.6);
-    } else {
-      clearInterval(bgmSchedTimer);
-      bgmMaster.gain.cancelScheduledValues(bgmCtx.currentTime);
-      bgmMaster.gain.linearRampToValueAtTime(0, bgmCtx.currentTime + 0.4);
-    }
-  }
-  function bgmOnHidden(hidden) {
-    if (!bgmCtx) return;
-    if (hidden) { try { bgmCtx.suspend(); } catch (e) {} }
-    else if (bgmOn) { try { bgmCtx.resume(); } catch (e) {} }
-  }
-
-  // ---------- 効果音(♪がオンのときだけ鳴る) と 振動 ----------
-  var sfxGain = null, lastTapSfx = 0;
-  var PENTA = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
-  function sfxTone(freq, t, dur, type, peak) {
-    var o = bgmCtx.createOscillator(), g = bgmCtx.createGain();
-    o.type = type || 'sine'; o.frequency.value = freq;
+  function noiseSrc(brown) { var s = actx.createBufferSource(); s.buffer = brown ? brownBuf : noiseBuf; s.loop = true; s.loopStart = rnd(0, 1); return s; }
+  function env(g, t, peak, a, hold, r) {
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(peak || 0.2, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(sfxGain);
-    o.start(t); o.stop(t + dur + 0.05);
+    g.gain.linearRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + r);
   }
-  function sfx(name) {
-    if (!bgmOn || !bgmCtx) return;
-    if (!sfxGain) { sfxGain = bgmCtx.createGain(); sfxGain.gain.value = 0.32; sfxGain.connect(bgmCtx.destination); }
-    var t = bgmCtx.currentTime + 0.01;
-    if (name === 'tap') {
-      if (t - lastTapSfx < 0.09) return;
-      lastTapSfx = t;
-      sfxTone(PENTA[Math.floor(Math.random() * PENTA.length)] * 2, t, 0.18, 'sine', 0.05);
-    } else if (name === 'buy') {
-      sfxTone(659.25, t, 0.35, 'triangle', 0.14); sfxTone(987.77, t + 0.07, 0.45, 'sine', 0.1);
-    } else if (name === 'guide') {
-      [523.25, 659.25, 783.99, 1046.5].forEach(function (f, i) { sfxTone(f, t + i * 0.09, 0.9, 'sine', 0.13); });
-    } else if (name === 'find') {
-      [1046.5, 1318.5, 1568.0].forEach(function (f, i) { sfxTone(f, t + i * 0.06, 0.6, 'sine', 0.08); });
-    } else if (name === 'rank') {
-      [261.63, 329.63, 392.0, 523.25].forEach(function (f) { sfxTone(f, t, 2.2, 'triangle', 0.09); });
-      sfxTone(1046.5, t + 0.25, 1.4, 'sine', 0.07);
-    } else if (name === 'horn') {
-      // 遠くの霧笛
-      var o = bgmCtx.createOscillator(), f = bgmCtx.createBiquadFilter(), g = bgmCtx.createGain();
-      o.type = 'sawtooth'; o.frequency.value = 82;
-      f.type = 'lowpass'; f.frequency.value = 320;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(0.16, t + 0.4);
-      g.gain.setValueAtTime(0.16, t + 1.6);
-      g.gain.linearRampToValueAtTime(0.0001, t + 2.6);
-      o.connect(f); f.connect(g); g.connect(sfxGain);
-      o.start(t); o.stop(t + 2.7);
+  function panner(v) { if (actx.createStereoPanner) { var p = actx.createStereoPanner(); p.pan.value = v; return p; } return actx.createGain(); }
+
+  // --- 環境音 ---
+  function startAmbient() {
+    if (ambNodes || !audioReady()) return;
+    // 風：帯域ノイズの中心が、ゆっくりさまよう
+    var w = noiseSrc(false), wf = actx.createBiquadFilter(), wg = actx.createGain();
+    wf.type = 'bandpass'; wf.frequency.value = 500; wf.Q.value = 0.8; wg.gain.value = 0.02;
+    w.connect(wf); wf.connect(wg); wg.connect(ambBus); w.start();
+    ambNodes = { wind: w, windF: wf, windG: wg };
+    nextWave = actx.currentTime + 0.2; nextEvent = actx.currentTime + rnd(20, 40);
+    clearInterval(ambTimer);
+    ambTimer = setInterval(ambientTick, 500);
+    ambientTick();
+  }
+  function stopAmbient() {
+    clearInterval(ambTimer); ambTimer = 0;
+    if (ambNodes) { try { ambNodes.wind.stop(); } catch (e) {} ambNodes = null; }
+  }
+  function wave(t) {
+    // 寄せては返す波：1回ごとに長さ・高さ・左右を変える（同じ繰り返しに聞こえないように）
+    var s = noiseSrc(true), f = actx.createBiquadFilter(), g = actx.createGain(), p = panner(rnd(-0.6, 0.6));
+    f.type = 'lowpass'; f.frequency.setValueAtTime(rnd(250, 420), t); f.frequency.linearRampToValueAtTime(rnd(700, 1300), t + rnd(1.5, 3)); f.frequency.linearRampToValueAtTime(rnd(200, 350), t + rnd(5, 8));
+    var a = rnd(1.6, 3.2), r = rnd(3, 5.5), peak = rnd(0.05, 0.11) * (0.6 + 0.4 * nightness());
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + r);
+    s.connect(f); f.connect(g); g.connect(p); p.connect(ambBus);
+    s.start(t); s.stop(t + a + r + 0.2);
+    return a + r;
+  }
+  function ambientTick() {
+    if (!actx || !ambNodes) return;
+    var now = actx.currentTime;
+    // 風は昼に少し強く、夜は静かに
+    var n = nightness();
+    ambNodes.windF.frequency.setTargetAtTime(rnd(320, 900), now, 2.5);
+    ambNodes.windG.gain.setTargetAtTime((0.012 + 0.02 * (1 - n)) * (state && Date.now() < state.boostUntil ? 1.8 : 1), now, 2);
+    while (nextWave < now + 1) { var d = wave(nextWave); nextWave += d * rnd(0.45, 0.7); }
+    if (now >= nextEvent) {
+      var r = Math.random();
+      if (r < 0.45) bell(now + 0.1, 0.035, rnd(380, 460));       // 遠くのブイの鐘
+      else if (r < 0.75) shipHorn(now + 0.1, 0.03);                // 遠い汽笛
+      else creak(now + 0.1);                                        // 木のきしみ
+      nextEvent = now + rnd(35, 80);
     }
+  }
+  // --- 音のかけら ---
+  function bell(t, vol, base) {
+    // 鐘：整数倍にならない倍音をいくつか重ね、ゆっくり消える
+    [1, 2.0, 2.76, 4.07, 5.4].forEach(function (m, i) {
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = base * m * rnd(0.995, 1.005);
+      env(g, t, vol / (i + 1), 0.006, 0, rnd(2.5, 4.5) / (1 + i * 0.4));
+      o.connect(g); g.connect(sfxBusFor(vol)); g.connect(verbSend);
+      o.start(t); o.stop(t + 5);
+    });
+  }
+  function sfxBusFor(vol) { return vol < 0.04 ? ambBus : sfxBus; }   // 小さな遠い音は環境音の側で鳴らす
+  function shipHorn(t, vol) {
+    // 汽笛：のこぎり波を低くこもらせ、ゆっくりふくらませる
+    [[rnd(98, 112), 0], [rnd(130, 148), 0.08]].forEach(function (fv) {
+      var o = actx.createOscillator(), f = actx.createBiquadFilter(), g = actx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = fv[0]; f.type = 'lowpass'; f.frequency.value = 380;
+      env(g, t + fv[1], vol, 0.35, rnd(0.6, 0.9), 1.1);
+      o.connect(f); f.connect(g); g.connect(sfxBusFor(vol)); g.connect(verbSend);
+      o.start(t + fv[1]); o.stop(t + fv[1] + 2.6);
+    });
+  }
+  function creak(t) {
+    var s = noiseSrc(false), f = actx.createBiquadFilter(), g = actx.createGain();
+    f.type = 'bandpass'; f.Q.value = 14; f.frequency.setValueAtTime(rnd(300, 420), t); f.frequency.linearRampToValueAtTime(rnd(520, 700), t + 0.5);
+    env(g, t, 0.05, 0.05, 0.3, 0.25);
+    s.connect(f); f.connect(g); g.connect(ambBus); s.start(t); s.stop(t + 0.8);
+  }
+  function burst(t, type, freq, q, vol, a, r, bus) {
+    var s = noiseSrc(false), f = actx.createBiquadFilter(), g = actx.createGain();
+    f.type = type; f.frequency.value = freq; f.Q.value = q;
+    env(g, t, vol, a, 0, r);
+    s.connect(f); f.connect(g); g.connect(bus || sfxBus); s.start(t); s.stop(t + a + r + 0.05);
+    return f;
+  }
+  function glass(t, vol) {
+    var base = rnd(2600, 3300);
+    [1, 2.4].forEach(function (m, i) {
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = base * m;
+      env(g, t, vol / (i + 1.5), 0.003, 0, rnd(0.6, 1.0));
+      o.connect(g); g.connect(sfxBus); g.connect(verbSend); o.start(t); o.stop(t + 1.2);
+    });
+  }
+  // --- 効果音（意味のある結果のときだけ、控えめに） ---
+  function sfx(name, opt) {
+    if (!state || !state.snd.sfx || !audioReady()) return;
+    var t = actx.currentTime + 0.01;
+    if (name === 'tap') {
+      // 布で磨く音：短いノイズの擦れ。毎回、長さと帯域をゆらす。ときどきガラスがかすかに鳴る
+      if (t - lastTapSfx < 0.07) return;
+      lastTapSfx = t; tapCount++;
+      burst(t, 'bandpass', rnd(1800, 3200), rnd(0.8, 1.6), rnd(0.05, 0.08), 0.012, rnd(0.06, 0.11));
+      if (tapCount % 7 === 0) glass(t + 0.02, 0.012);
+    } else if (name === 'buy') {
+      // 木版を刷る「とん」：小さな打音と、木の胴の響き。設備が上の段ほど少し低く
+      var tier = (opt && opt.tier) || 0;
+      burst(t, 'highpass', 1200, 0.7, 0.05, 0.002, 0.02);
+      var body = burst(t, 'bandpass', rnd(380, 440) * Math.pow(0.94, tier), 9, 0.2, 0.004, rnd(0.12, 0.18));
+      body.frequency.exponentialRampToValueAtTime(body.frequency.value * 0.9, t + 0.15);
+    } else if (name === 'guide') {
+      // 遠くの船が、汽笛で応える
+      shipHorn(t + 0.05, 0.07);
+    } else if (name === 'find') {
+      var k = opt && opt.kind;
+      if (k === 'gull') {
+        for (var i = 0; i < 3; i++) burst(t + i * 0.09, 'bandpass', rnd(700, 1000), 1.2, 0.05, 0.01, 0.06);   // 羽ばたき
+      } else {
+        var f = burst(t, 'lowpass', 2800, 0.7, 0.07, 0.01, 0.4);                                              // 水音
+        f.frequency.exponentialRampToValueAtTime(400, t + 0.4);
+        if (k === 'whale') shipHorn(t + 0.3, 0.025);
+      }
+      if (opt && opt.first) glass(t + 0.25, 0.02);
+    } else if (name === 'rank') {
+      // 格上げ：深い鐘と、ふくらむ風
+      bell(t, 0.12, rnd(96, 104));
+      var wf = burst(t, 'bandpass', 400, 0.6, 0.05, 1.2, 2.2);
+      wf.frequency.linearRampToValueAtTime(900, t + 2.5);
+    } else if (name === 'horn') {
+      // 霧笛：二つの音の「ぶぉー、おー」。遠くでこもって響く
+      [[82, 0, 1.3], [65, 1.25, 1.1]].forEach(function (v) {
+        var o = actx.createOscillator(), fl = actx.createBiquadFilter(), g = actx.createGain();
+        o.type = 'sawtooth'; o.frequency.value = v[0] * rnd(0.98, 1.02); fl.type = 'lowpass'; fl.frequency.value = 300;
+        env(g, t + v[1], 0.11, 0.25, v[2] - 0.5, 0.6);
+        o.connect(fl); fl.connect(g); g.connect(sfxBus); g.connect(verbSend);
+        o.start(t + v[1]); o.stop(t + v[1] + v[2] + 0.4);
+      });
+    }
+  }
+  // --- 切り替え ---
+  function applySound() {
+    var amb = !!state.snd.bgm, fx = !!state.snd.sfx;
+    ['sndAmb', 'sndAmb2'].forEach(function (id) { var b = $(id); if (b) b.setAttribute('aria-pressed', amb ? 'true' : 'false'); });
+    ['sndSfx', 'sndSfx2'].forEach(function (id) { var b = $(id); if (b) b.setAttribute('aria-pressed', fx ? 'true' : 'false'); });
+    $('bgmBtn').dataset.on = amb || fx ? 'true' : 'false';
+    if (!actx) { if (amb && audioReady()) startAmbient(); else return; }
+    if (amb) startAmbient(); else stopAmbient();
+    ambBus.gain.setTargetAtTime(amb ? 1 : 0, actx.currentTime, 0.4);
+  }
+  function setSound(key) {
+    state.snd[key] = state.snd[key] ? 0 : 1;
+    audioReady();
+    applySound(); save();
+    if (key === 'sfx' && state.snd.sfx) sfx('buy');
+  }
+  function soundOnHidden(hidden) {
+    if (!actx) return;
+    if (hidden) { try { actx.suspend(); } catch (e) {} }
+    else { try { actx.resume(); } catch (e) {} }
   }
   function buzz(pattern) {
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
@@ -999,28 +1410,55 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
   // ---------- 画面の更新 ----------
   var genEls = {}, teaserEl = null, upList = $('upList'), genList = $('genList');
 
+  // 買い物の1行：［名前・持っている数］（押すと説明が開く）と［値段の札］（押すと買う）
+  function makeRow(name, onBuy) {
+    var row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = '<button class="row-main" type="button" aria-expanded="false"><span class="name"></span><span class="own num"></span></button>' +
+      '<button class="price num" type="button"></button>' +
+      '<div class="detail" hidden><p class="desc"></p><p class="sub num"></p></div>';
+    var el = {
+      row: row, main: row.querySelector('.row-main'), own: row.querySelector('.own'), price: row.querySelector('.price'),
+      detail: row.querySelector('.detail'), desc: row.querySelector('.desc'), sub: row.querySelector('.sub')
+    };
+    row.querySelector('.name').textContent = name;
+    el.main.addEventListener('click', function () {
+      var open = el.detail.hidden;
+      el.detail.hidden = !open;
+      el.main.setAttribute('aria-expanded', open ? 'true' : 'false');
+      renderAll();
+    });
+    el.price.addEventListener('click', function () {
+      if (el.price.getAttribute('aria-disabled') === 'true') {
+        // 買えないときは、札が小さく揺れて残りを知らせる
+        row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake');
+        return;
+      }
+      onBuy();
+    });
+    return el;
+  }
+  function setPrice(el, text, ok, label) {
+    if (el.priceText !== text) { el.price.innerHTML = text; el.priceText = text; }
+    el.price.classList.toggle('ok', ok);
+    el.price.setAttribute('aria-disabled', ok ? 'false' : 'true');
+    el.price.setAttribute('aria-label', label);
+  }
   function buildGens() {
     genList.innerHTML = '';
     GENS.forEach(function (g) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'row'; b.hidden = true;
-      b.innerHTML = '<span class="own">0</span>' +
-        '<span class="info"><span class="name">' + g.name + '</span><span class="desc">' + g.desc + '</span><span class="rate"></span></span>' +
-        '<span class="buy"><span class="cost"></span><span class="unit"></span></span>';
-      b.addEventListener('click', function () { buyGen(g.id); });
-      genList.appendChild(b);
-      genEls[g.id] = {
-        row: b, own: b.querySelector('.own'), rate: b.querySelector('.rate'),
-        cost: b.querySelector('.cost'), unit: b.querySelector('.unit')
-      };
+      var el = makeRow(g.name, function () { buyGen(g.id); });
+      el.desc.textContent = g.desc;
+      el.row.hidden = true;
+      genList.appendChild(el.row);
+      genEls[g.id] = el;
     });
     teaserEl = document.createElement('div');
-    teaserEl.className = 'row locked'; teaserEl.hidden = true;
-    teaserEl.innerHTML = '<span class="own">?</span><span class="info"><span class="name">？？？</span><span class="desc">もっと光を集めると、新しい設備が見えてきます。</span></span><span></span>';
+    teaserEl.className = 'row tz'; teaserEl.hidden = true;
+    teaserEl.innerHTML = '<p class="tz-text">もっと光を集めると、新しい設備が見えてきます。</p>';
     genList.appendChild(teaserEl);
   }
 
-  // 買えるまでの目安時間(毎秒の産出から計算)
   function waitText(need) {
     var c = cps();
     if (need <= 0 || c <= 0) return '';
@@ -1041,18 +1479,15 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       var e = genEls[g.id], own = state.owned[g.id];
       var show = genShown(i);
       e.row.hidden = !show;
-      if (!show) {
-        if (!teaserShown) { teaserShown = true; }
-        return;
-      }
+      if (!show) { teaserShown = true; return; }
       var p = plan(g), ok = state.light >= p.cost, u = unit(g);
       e.own.textContent = own;
-      e.rate.textContent = '各 +' + fmtNum(u) + '/秒' + (own > 0 ? ' ・ 計 ' + fmtNum(own * u) + '/秒' : '');
-      e.cost.textContent = fmtNum(p.cost);
-      var wt = ok ? '' : waitText(p.cost - state.light);
-      e.unit.textContent = wt || (p.n > 1 ? '光 ×' + p.n : '光');
-      e.row.classList.toggle('afford', ok);
-      e.row.disabled = !ok;
+      setPrice(e, fmtNum(p.cost) + (p.n > 1 ? '<small>×' + p.n + '</small>' : ''), ok,
+        g.name + (p.n > 1 ? 'を' + p.n + '台' : '') + '　' + fmtNum(p.cost) + ' 光' + (ok ? '' : '（足りません）'));
+      if (!e.detail.hidden) {
+        var wt = ok ? '' : waitText(p.cost - state.light);
+        e.sub.textContent = '1台 +' + fmtNum(u) + '/秒' + (own > 0 ? '・いま 計 ' + fmtNum(own * u) + '/秒' : '') + (wt ? '・' + wt + 'で買えます' : '');
+      }
     });
     teaserEl.hidden = !teaserShown;
   }
@@ -1062,11 +1497,24 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] > 0);
     }).sort(function (a, b) { return a.cost - b.cost; });
   }
+  // 強化タブは最初の強化が見えたとき、まとめ買いは設備を合計10個持ったときに出す（一度出たら出したまま）
+  function renderReveal() {
+    var ownedSum = 0;
+    GENS.forEach(function (g) { ownedSum += state.owned[g.id]; });
+    if (!state.ui.up && (visibleUps().length > 0 || UPS.some(function (u) { return state.ups[u.id]; }))) state.ui.up = 1;
+    if (!state.ui.qty && ownedSum >= 10) state.ui.qty = 1;
+    var tg = $('tabGen'), tu = $('tabUp'), q = $('qty');
+    tg.hidden = tu.hidden = !state.ui.up;
+    q.hidden = !state.ui.qty || upList.hidden === false;
+    $('tabs').hidden = !state.ui.up && !state.ui.qty;
+    if (!state.ui.qty && qty !== 1) qty = 1;
+  }
+  var upEls = {};
   function renderUps() {
     var list = visibleUps(), sig = list.map(function (u) { return u.id; }).join(',');
     if (sig !== upSig) {
       upSig = sig;
-      upList.innerHTML = '';
+      upList.innerHTML = ''; upEls = {};
       if (!list.length) {
         var p = document.createElement('p');
         p.className = 'empty';
@@ -1074,31 +1522,29 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
         upList.appendChild(p);
       }
       list.forEach(function (u) {
-        var b = document.createElement('button');
-        b.type = 'button'; b.className = 'row kind'; b.dataset.id = u.id;
-        var tag = u.tap || u.share ? '磨' : u.gen ? '設' : '全';
-        b.innerHTML = '<span class="own">' + tag + '</span>' +
-          '<span class="info"><span class="name">' + u.name + '</span><span class="desc">' + u.desc + '</span></span>' +
-          '<span class="buy"><span class="cost">' + fmtNum(u.cost) + '</span><span class="unit">光</span></span>';
-        b.addEventListener('click', function () { buyUp(u.id); });
-        upList.appendChild(b);
+        var el = makeRow(u.name, function () { buyUp(u.id); });
+        el.desc.textContent = u.desc;
+        el.own.textContent = '';
+        el.row.dataset.id = u.id;
+        upList.appendChild(el.row);
+        upEls[u.id] = el;
       });
     }
-    var rows = upList.querySelectorAll('.row'), canBuy = 0;
-    for (var i = 0; i < rows.length; i++) {
-      var uc = UMAP[rows[i].dataset.id].cost, ok = state.light >= uc;
-      var un = rows[i].querySelector('.unit');
-      if (un) un.textContent = ok ? '光' : (waitText(uc - state.light) || '光');
+    var canBuy = 0;
+    list.forEach(function (u) {
+      var el = upEls[u.id], ok = state.light >= u.cost;
       if (ok) canBuy++;
-      rows[i].classList.toggle('afford', ok);
-      rows[i].disabled = !ok;
-    }
+      setPrice(el, fmtNum(u.cost), ok, u.name + '　' + fmtNum(u.cost) + ' 光' + (ok ? '' : '（足りません）'));
+      if (!el.detail.hidden) {
+        var wt = ok ? '' : waitText(u.cost - state.light);
+        el.sub.textContent = wt ? wt + 'で買えます' : '';
+      }
+    });
     $('upDot').hidden = upList.hidden === false || canBuy === 0;
     var bought = UPS.filter(function (u) { return state.ups[u.id]; }).length;
     $('upCount').textContent = bought + '/' + UPS.length;
   }
 
-  // 次の目標: まだ持っていない設備と買える強化のうち、いちばん安いもの。買えるものがあれば知らせる。
   function renderGoal() {
     var cands = [], i;
     for (i = 0; i < GENS.length; i++) {
@@ -1109,20 +1555,18 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       GENS.forEach(function (g) { cands.push({ name: g.name, cost: Math.ceil(g.base * Math.pow(1.15, state.owned[g.id])) }); });
     }
     var ready = cands.filter(function (c) { return c.cost <= state.light; });
-    var pick, left, pct;
+    var pick, left;
     if (ready.length) {
       ready.sort(function (a, b) { return b.cost - a.cost; });
-      pick = ready[0]; left = 'いま買えます'; pct = 100;
+      pick = ready[0]; left = 'いま買えます';
     } else {
       cands.sort(function (a, b) { return a.cost - b.cost; });
       pick = cands[0];
       left = 'あと ' + fmtNum(Math.ceil(pick.cost - state.light)) + ' 光';
-      pct = Math.min(100, state.light / pick.cost * 100);
     }
     $('goal').dataset.ready = ready.length ? 'true' : 'false';
     $('goalName').textContent = pick.name;
     $('goalLeft').textContent = left;
-    $('goalFill').style.width = pct + '%';
   }
 
   // 図鑑の絵(線と面だけの小さなシルエット)
@@ -1138,48 +1582,89 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     if (sig === zukanSig) return;
     zukanSig = sig;
     var n = metKinds();
-    $('zukanSum').innerHTML = n + '/' + KINDS.length + (n ? ' ・ 産出 <b>+' + (n * 5) + '%</b>' : '');
+    $('zukanSum').innerHTML = KINDS.length + '種のうち' + n + '種' + (n ? '・産出 <b>+' + (n * 5) + '%</b>' : '');
     var ul = $('zukanList');
     ul.innerHTML = '';
     KINDS.forEach(function (k) {
       var c = state.met[k.id] || 0, li = document.createElement('li');
       if (c > 0) li.className = 'met';
-      li.title = c > 0 ? k.note : 'まだ出会っていない';
       li.innerHTML = KIND_SVG[k.id] +
-        '<span class="zname">' + (c > 0 ? k.name : '？？？') + '</span>' +
-        '<span class="zcount">' + (c > 0 ? c + '回' : '未発見') + '</span>';
+        '<span><span class="zname">' + (c > 0 ? k.name : '？？？') + '</span><span class="znote">' + (c > 0 ? k.note : 'まだ出会っていない') + '</span></span>' +
+        '<span class="zcount">' + (c > 0 ? c + '回' : '') + '</span>';
       ul.appendChild(li);
     });
   }
 
+
+  var htmlCache = {};
+  function setHTML(id, html) {
+    if (htmlCache[id] === html) return;
+    htmlCache[id] = html;
+    $(id).innerHTML = html;
+  }
+  // 次の格までの進み：いまの格の基準から次の格の基準まで（光達距離）を7つの点で
+  var rankNewsTimer = 0;
+  function showRankNews(name) {
+    $('rankNewsName').textContent = name;
+    $('rankNews').hidden = false;
+    clearTimeout(rankNewsTimer);
+    rankNewsTimer = setTimeout(function () { $('rankNews').hidden = true; }, 4800);
+  }
+  var STEP_N = 7;
+  var STEP_LH = '<svg width="16" height="20" viewBox="0 0 18 22" aria-hidden="true"><path d="M6 6h6l2 15H4z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 12h8" stroke="currentColor" stroke-width="3"/><path d="M5 6l4-4 4 4z" fill="currentColor"/></svg>';
+  function renderRank(ri) {
+    var on, label;
+    if (ri >= RANKS.length - 1) {
+      on = STEP_N; label = 'いちばん上の格です';
+    } else {
+      var from = Math.max(3, RANKS[ri][0]), to = RANKS[ri + 1][0];
+      var frac = Math.max(0, Math.min(1, (rangeNow - from) / (to - from)));
+      on = Math.min(STEP_N - 1, Math.floor(frac * STEP_N));
+      label = '次の格「' + RANKS[ri + 1][1] + '」まで ' + on + '/' + STEP_N;
+    }
+    var key = ri + ':' + on;
+    if (htmlCache.rank === key) return;
+    htmlCache.rank = key;
+    $('rankName').textContent = RANKS[ri][1];
+    var h = '';
+    for (var i = 0; i < STEP_N; i++) h += '<i class="' + (i < on ? 'on' : '') + '"></i>';
+    $('rankSteps').innerHTML = h + STEP_LH;
+    $('rankSteps').setAttribute('aria-label', label);
+  }
+
   var uiLast = '';
   function renderAll() {
+    applyTimeColors();
+    placeCalls();
     var c = cps();
     rangeNow = rangeOf(state.total);
     var ri = rankIdx(rangeNow);
     if (ri > state.rank) {
       state.rank = ri;
-      rankFlash = 1;
+      rankFlash = 1; rankFx = 1;
       buzz([30, 60, 40]);
       sfx('rank');
-      toast('灯台の格が上がりました。' + RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
+      showRankNews(RANKS[ri][1]);
     }
     $('light').textContent = fmtNum(Math.floor(state.light));
-    var bm = boostMult();
-    var bmLabel = bm % 1 === 0 ? String(bm) : bm.toFixed(1);
-    $('cps').textContent = '毎秒 ' + fmtNum(c) + (bm > 1 ? '  ' + (goldenActive() ? '✨' : '') + 'ブースト ×' + bmLabel : '');
+    // 毎秒の横に、追い風（×2）と凪の恵み（凪×1.5）を言葉で添える
+    var tags = '';
+    if (Date.now() < state.boostUntil) tags += '<em>追い風×2</em>';
+    if (goldenActive()) tags += '<em>凪×1.5</em>';
+    setHTML('cps', '毎秒 ' + fmtNum(c) + tags);
     $('tapGain').textContent = '+' + fmtNum(tapPower());
-    $('rankName').textContent = RANKS[ri][1];
-    $('rangeVal').textContent = rangeNow.toFixed(1);
+    renderRank(ri);
     $('stGuided').textContent = state.guided + '隻';
     $('stTaps').textContent = state.taps.toLocaleString('ja-JP') + '回';
     $('stTotal').textContent = fmtNum(Math.floor(state.total));
-    $('hint').hidden = state.guided >= 1 || state.taps >= 100;
+    $('stRange').textContent = rangeNow.toFixed(1) + ' 海里';
+    renderReveal();
     renderGens();
     renderUps();
     renderBoost();
     renderGoal();
     renderZukan();
+    tutorialTick();
   }
 
   // ---------- タップ可否の判定(全画面背景化でUIカードが海に重なるため、
@@ -1230,7 +1715,11 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       bonus: isBonus, done: false, lit: false, hit: 30
     };
     ships.push(s);
-    if (isBonus) { bonus = s; $('guide').hidden = false; }
+    if (isBonus) {
+      bonus = s;
+      $('guideText').textContent = '金の船が通ります';
+      $('guide').hidden = false;
+    }
     return s;
   }
   function ambientTarget() { return 1 + Math.min(4, Math.floor((rangeNow - 3) / 4)); }
@@ -1335,13 +1824,13 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     state.found++;
     var reward = Math.max(k.min, cps() * k.mult);
     gain(reward);
-    addFloater(creature.x, (creature.y0 || creature.y) - 22, '+' + fmtNum(reward));
+    showGain(reward);
     if (first) {
-      toast('図鑑に「' + k.name + '」が加わりました。光 +' + fmtNum(reward) + '、産出がずっと +5%', 5200);
-      buzz([20, 40, 20]); sfx('find');
+      toast('図鑑に「' + k.name + '」。産出がずっと +5%', 4200, 3);
+      buzz([20, 40, 20]); sfx('find', { kind: k.id, first: true });
     } else {
-      toast(k.line + '光 +' + fmtNum(reward), 3400);
-      buzz(15); sfx('find');
+      toast(k.line, 3000, 1, 'kind');
+      buzz(15); sfx('find', { kind: k.id });
     }
     creature = null;
     renderAll(); save();
@@ -1387,71 +1876,103 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     if (state) seedShips();
   }
 
+  // ---------- 景色の色（版画の色の帯。時間帯で移る） ----------
+  var PRINT = {
+    sky: { night: ['#1D2944', '#24365A', '#2D4568', '#2D4568'], dawn: ['#6B7096', '#B39AB0', '#EDB89A', '#F6D4AF'],
+           day: ['#7DB9E0', '#9CCDEB', '#C2E2F2', '#C2E2F2'], dusk: ['#F4B266', '#F7C98E', '#F9DDB0', '#F9DDB0'] },
+    sea: { night: '#173F4A', dawn: '#4D7079', day: '#2D6A99', dusk: '#2F8080' },
+    wave: { night: '#2C6168', dawn: '#36575F', day: '#F4F8FA', dusk: '#1B4E52' },
+    isle: { night: '#1C140F', dawn: '#2E2420', day: '#34473C', dusk: '#33261F' },
+    isleGhost: { night: '#2D5560', dawn: '#7A5E6A', day: '#2D6A99', dusk: '#5B3B2B' },
+    tower: { night: '#EFE3C8', dawn: '#F7ECD6', day: '#FBF6EA', dusk: '#FBF1DC' },
+    band: { night: '#B8492B', dawn: '#C4553A', day: '#C42A2A', dusk: '#E2643F' },
+    towerGhost: { night: '#3E6F78', dawn: '#2F8080', day: '#2D6A99', dusk: '#2F8080' },
+    orb: { night: '#F3E6C4', dawn: '#FBE3BE', day: '#FFF3C4', dusk: '#FBEBCB' },
+    orbRing: { night: '#7FA6B0', dawn: '#E2643F', day: '#E2643F', dusk: '#E2643F' },
+    cloud: { night: '#33456A', dawn: '#F6D9C8', day: '#FFFFFF', dusk: '#FBE3C0' },
+    path: { night: '#F3E6C4', dawn: '#FBE3BE', day: '#FFFFFF', dusk: '#FBEBCB' },
+    hull: { night: '#1C140F', dawn: '#2E2420', day: '#33261F', dusk: '#33261F' }
+  };
+  // 月・日：x（画面幅の割合）、y（水平線までの割合）、半径、海面の光の道の濃さ
+  var ORB = { night: [0.23, 0.27, 22, 0.8], dawn: [0.76, 0.98, 26, 0.75], day: [0.82, 0.2, 20, 0], dusk: [0.73, 0.74, 44, 0.8] };
+  function pc(key, ph) { return lerpColor(PRINT[key][ph.from], PRINT[key][ph.to], ph.t); }
+  function pn(i, ph) { return lerpN(ORB[ph.from][i], ORB[ph.to][i], ph.t); }
   function drawSky(t, ph) {
-    var sc0 = SKY_COLORS[ph.from], sc1 = SKY_COLORS[ph.to];
-    var g = ctx.createLinearGradient(0, 0, 0, horizon);
-    g.addColorStop(0, lerpColor(sc0[0], sc1[0], ph.t));
-    g.addColorStop(0.5, lerpColor(sc0[1], sc1[1], ph.t));
-    g.addColorStop(0.85, lerpColor(sc0[2], sc1[2], ph.t));
-    g.addColorStop(1, lerpColor(sc0[3], sc1[3], ph.t));
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, horizon + 1);
+    var b0 = PRINT.sky[ph.from], b1 = PRINT.sky[ph.to], ys = [0, 0.49, 0.78, 0.925, 1];
+    for (var i = 0; i < 4; i++) {
+      ctx.fillStyle = lerpColor(b0[i], b1[i], ph.t);
+      ctx.fillRect(0, horizon * ys[i], W, horizon * (ys[i + 1] - ys[i]) + 1);
+    }
     var starVis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
-    ctx.fillStyle = '#fff6e0';
-    for (var i = 0; i < stars.length; i++) {
-      var s = stars[i];
-      var a = reduce ? 0.65 : 0.45 + 0.35 * Math.sin(t * s.sp + s.ph);
-      ctx.globalAlpha = Math.max(0, a * (1 - s.y / (horizon * 0.9)) * starVis);
-      ctx.fillRect(s.x, s.y, s.r, s.r);
+    if (starVis > 0.02) {
+      ctx.fillStyle = '#F3E6C4';
+      for (var k = 0; k < stars.length; k++) {
+        var st = stars[k];
+        var a = reduce ? 0.7 : 0.55 + 0.35 * Math.sin(t * st.sp + st.ph);
+        ctx.globalAlpha = Math.max(0, a * starVis);
+        ctx.beginPath(); ctx.arc(st.x, st.y, st.r * 0.9 + 0.4, 0, 6.283); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
-    // ふちのぼやけた薄雲。楕円をそのまま塗らず、放射グラデーションを横に引き伸ばして描く。
-    for (var j = 0; j < 3; j++) {
-      var sp = reduce ? 0 : 4 + j * 2, span = W + 360;
-      var cw = 110 + j * 40, ch = 7 + j * 3;
-      var x = ((j * W * 0.45 + t * sp) % span) - 180;
-      var cy = horizon * (0.6 + j * 0.11);
-      ctx.save();
-      ctx.translate(x, cy); ctx.scale(1, ch / cw);
-      var cg = ctx.createRadialGradient(0, 0, 0, 0, 0, cw);
-      cg.addColorStop(0, 'rgba(255,205,180,0.13)');
-      cg.addColorStop(0.55, 'rgba(255,205,180,0.06)');
-      cg.addColorStop(1, 'rgba(255,205,180,0)');
-      ctx.fillStyle = cg;
-      ctx.beginPath(); ctx.arc(0, 0, cw, 0, 6.283); ctx.fill();
-      ctx.restore();
-    }
-    drawMoon(ph);
+    drawOrb(ph);
+    drawClouds(t, ph);
     drawShoot();
+    if (state && Date.now() < state.boostUntil) drawWind(t);
   }
+
   // ---------- 月・星屑・流れ星(神秘的な演出) ----------
-  function moonPos() {
-    var frac = (dayT % DAY_CYCLE_SEC) / DAY_CYCLE_SEC;
-    return {
-      x: W * frac,
-      y: horizon * (0.14 + 0.06 * Math.sin(frac * 6.283 + 1.1))
-    };
+  function orbPos(ph) {
+    var u = W / 360;
+    return { x: W * pn(0, ph), y: horizon * pn(1, ph), r: pn(2, ph) * u, path: pn(3, ph) };
   }
-  function drawMoon(ph) {
-    var a = lerpN(MOON_VIS[ph.from], MOON_VIS[ph.to], ph.t);
-    if (a <= 0.02) { lastMoon = null; return; }
-    var m = moonPos(), r = Math.max(13, W * 0.042);
+
+  function drawOrb(ph) {
+    // 月と日は同じ「刷った円」。少しずれた輪で版のずれを出す。夜明けの日は水平線から半分だけ。
+    var o = orbPos(ph);
     ctx.save();
-    ctx.globalAlpha = a;
-    var halo = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r * 4.4);
-    halo.addColorStop(0, 'rgba(228,234,255,0.32)');
-    halo.addColorStop(1, 'rgba(228,234,255,0)');
-    ctx.fillStyle = halo;
-    ctx.fillRect(m.x - r * 4.4, m.y - r * 4.4, r * 8.8, r * 8.8);
-    var g = ctx.createRadialGradient(m.x - r * 0.32, m.y - r * 0.3, r * 0.1, m.x, m.y, r);
-    g.addColorStop(0, '#fbfbff'); g.addColorStop(1, '#ccd5ee');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, 6.283); ctx.fill();
-    ctx.globalAlpha = a * 0.16; ctx.fillStyle = '#95a0c4';
-    ctx.beginPath(); ctx.arc(m.x - r * 0.3, m.y - r * 0.2, r * 0.22, 0, 6.283); ctx.fill();
-    ctx.beginPath(); ctx.arc(m.x + r * 0.26, m.y + r * 0.26, r * 0.16, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.rect(0, 0, W, horizon); ctx.clip();
+    ctx.fillStyle = pc('orb', ph);
+    ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = pc('orbRing', ph); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(o.x + 3, o.y + 2, o.r, 0, 6.283); ctx.stroke();
     ctx.restore();
-    lastMoon = { x: m.x, a: a };
+    lastMoon = o;
   }
+  // 平らな雲（版画の形）。ゆっくり流れる
+  var CLOUDS = [[0.08, 0.36, 1], [0.62, 0.6, 0.8], [0.36, 0.17, 0.66]];
+  function cloudPath(x, y, w) {
+    var h = w * 0.34;
+    ctx.beginPath();
+    ctx.rect(x + h * 0.3, y - h * 0.42, w - h * 0.6, h * 0.42);
+    var bumps = [[0.24, 0.42, 0.42], [0.5, 0.62, 0.6], [0.76, 0.44, 0.44]];
+    for (var i = 0; i < bumps.length; i++) {
+      var cx = x + w * bumps[i][0], cy = y - h * bumps[i][1], r = h * bumps[i][2];
+      ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, 6.283);
+    }
+  }
+  function drawClouds(t, ph) {
+    var col = pc('cloud', ph), span = W + 260;
+    for (var i = 0; i < CLOUDS.length; i++) {
+      var c = CLOUDS[i], w = W * 0.26 * c[2];
+      var x = ((c[0] * W + (reduce ? 0 : t * (2.5 + i * 1.2))) % span) - 130, y = horizon * c[1];
+      ctx.fillStyle = col; cloudPath(x, y, w); ctx.fill();
+    }
+  }
+  // 追い風が吹いているあいだ：空に風の筋
+  function drawWind(t) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    var span = W + 200;
+    for (var i = 0; i < 4; i++) {
+      var w = W * 0.22, x = ((i * 113 + (reduce ? 0 : t * 55)) % span) - 100, y = horizon * (0.3 + i * 0.15);
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + w * 0.5, y - 6, x + w, y);
+      ctx.quadraticCurveTo(x + w + 10, y + 3, x + w + 13, y - 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function updateShoot(dt, ph) {
     var nightish = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
     if (shootStar) {
@@ -1484,55 +2005,53 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     ctx.strokeStyle = g; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
   }
-  function drawMoonGlitter(t) {
-    if (!lastMoon || lastMoon.a <= 0.05) return;
-    var mx = lastMoon.x, a = lastMoon.a, rows = 9;
-    for (var i = 0; i < rows; i++) {
-      var y = horizon + (seaBottom() - horizon) * (i + 0.5) / rows;
-      var spread = 6 + i * 2.4;
-      var wob = reduce ? 0 : Math.sin(t * 1.6 + i * 1.3) * spread * 0.4;
-      var w = 9 + i * 2.2;
-      var al = a * (0.3 - i * 0.022) * (0.6 + 0.4 * (reduce ? 1 : Math.sin(t * 2.2 + i)));
-      if (al <= 0) continue;
-      ctx.fillStyle = 'rgba(228,234,255,' + al + ')';
-      ctx.fillRect(mx + wob - w / 2, y, w, 1.6);
-    }
-  }
-  function drawSparkles(t, ph) {
-    var vis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
-    if (vis <= 0.03) return;
-    ctx.fillStyle = 'rgba(185,255,232,1)';
-    for (var i = 0; i < sparkles.length; i++) {
-      var sp = sparkles[i];
-      var a = (0.18 + 0.32 * (reduce ? 0.6 : Math.sin(t * sp.sp + sp.ph))) * vis;
-      if (a <= 0) continue;
-      ctx.globalAlpha = a;
-      ctx.fillRect(sp.x, sp.y, sp.r, sp.r);
+  function drawMoonGlitter(t, ph) {
+    // 海面の光の道：月・日の下に、版画の横縞で
+    var o = lastMoon;
+    if (!o || o.path <= 0.02) return;
+    ctx.fillStyle = pc('path', ph);
+    var u = W / 360;
+    for (var i = 0; i < 9; i++) {
+      var y = horizon + 8 + i * (seaBottom() - horizon) / 9.5, w = (10 + i * 5) * u;
+      var wob = reduce ? 0 : Math.sin(t * 1.4 + i * 1.3) * 3;
+      ctx.globalAlpha = o.path * (1 - i * 0.06);
+      ctx.fillRect(o.x - w / 2 + (i % 2 ? 5 : -5) + wob, y, w, 3.5);
     }
     ctx.globalAlpha = 1;
   }
+
+  function drawSparkles(t, ph) {
+    var vis = lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t);
+    if (vis <= 0.03) return;
+    ctx.fillStyle = '#F3E6C4';
+    for (var i = 0; i < sparkles.length; i++) {
+      var sp = sparkles[i];
+      var a = (0.15 + 0.3 * (reduce ? 0.6 : Math.sin(t * sp.sp + sp.ph))) * vis;
+      if (a <= 0) continue;
+      ctx.globalAlpha = a;
+      ctx.fillRect(sp.x, sp.y, sp.r + 0.5, sp.r + 0.5);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function drawSea(t, ph) {
-    var sc0 = SEA_COLORS[ph.from], sc1 = SEA_COLORS[ph.to];
-    var g = ctx.createLinearGradient(0, horizon, 0, H);
-    g.addColorStop(0, lerpColor(sc0[0], sc1[0], ph.t));
-    g.addColorStop(0.35, lerpColor(sc0[1], sc1[1], ph.t));
-    g.addColorStop(1, lerpColor(sc0[2], sc1[2], ph.t));
-    ctx.fillStyle = g; ctx.fillRect(0, horizon, W, H - horizon);
-    ctx.fillStyle = 'rgba(240,170,130,0.35)'; ctx.fillRect(0, horizon, W, 1.5);
-    ctx.lineWidth = 1;
-    for (var i = 0; i < 7; i++) {
-      var y = horizon + (seaBottom() - horizon) * (i + 0.6) / 7;
-      ctx.strokeStyle = 'rgba(180,210,230,' + (0.05 + 0.015 * i) + ')';
+    ctx.fillStyle = pc('sea', ph); ctx.fillRect(0, horizon, W, H - horizon);
+    drawMoonGlitter(t, ph);
+    // 波：小さな弧の列（版画の模様）。行ごとに逆向きにゆっくり流れる
+    ctx.strokeStyle = pc('wave', ph); ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    var rows = 6, step = 44 * W / 360, drift = reduce ? 0 : (t * 4) % step;
+    for (var r = 0; r < rows; r++) {
+      var y = horizon + 16 + r * (seaBottom() - horizon + 30) / rows;
+      var off = (r % 2) * step / 2 + (r % 2 ? -drift : drift);
       ctx.beginPath();
-      for (var x = 0; x <= W; x += 12) {
-        var yy = y + Math.sin(x * 0.03 + (reduce ? 0 : t * 0.8) + i * 1.7) * 1.6;
-        if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      for (var x = -step * 2 + off; x < W + step; x += step) {
+        ctx.moveTo(x, y); ctx.quadraticCurveTo(x + step * 0.25, y - 8, x + step * 0.5, y);
       }
       ctx.stroke();
     }
-    drawMoonGlitter(t);
     drawSparkles(t, ph);
   }
+
   function lightDot(x, y, r, rgb, a) {
     var g = ctx.createRadialGradient(x, y, 0, x, y, r * 5);
     g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
@@ -1547,33 +2066,39 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     var k = Math.max(0, Math.min(1, (s.y - horizon) / (seaBottom() - horizon)));
     var sc = (0.75 + 0.7 * k) * u;
     var bob = reduce ? 0 : Math.sin(t * 1.3 + s.ph) * 1.4;
-    var lx, ly;
+    var lx, ly, ph = dayBlend();
+    var hull = s.lit ? '#6A5546' : pc('hull', ph), light = '#F3E6C4', sail = s.lit ? '#FBF1DC' : '#E2643F';
     ctx.save();
     ctx.translate(s.x, s.y + bob);
     ctx.scale(s.dir * sc, sc);
-    ctx.fillStyle = s.lit ? '#b9c7cb' : '#0a1722';
+    ctx.fillStyle = hull;
     ctx.beginPath();
     if (s.kind === 'cargo') {
       ctx.moveTo(-24, -8); ctx.lineTo(27, -8); ctx.lineTo(21, 0); ctx.lineTo(-22, 0); ctx.closePath(); ctx.fill();
-      ctx.fillRect(-22, -20, 10, 12); ctx.fillRect(-8, -13, 8, 5); ctx.fillRect(1, -13, 8, 5); ctx.fillRect(-4, -18, 8, 5);
+      ctx.fillStyle = light; ctx.fillRect(-22, -20, 10, 12);
+      ctx.fillStyle = sail; ctx.fillRect(-8, -13, 8, 5); ctx.fillRect(-4, -18, 8, 5);
+      ctx.fillStyle = '#F2C14E'; ctx.fillRect(1, -13, 8, 5);
       lx = -17; ly = -23;
     } else if (s.kind === 'fish') {
       ctx.moveTo(-13, -6); ctx.lineTo(14, -6); ctx.lineTo(9, 0); ctx.lineTo(-11, 0); ctx.closePath(); ctx.fill();
-      ctx.fillRect(-9, -13, 8, 7); ctx.fillRect(5.5, -17, 1, 11);
+      ctx.fillStyle = light; ctx.fillRect(-9, -13, 8, 7);
+      ctx.fillStyle = hull; ctx.fillRect(5.5, -17, 1.4, 11);
       lx = 6; ly = -18;
     } else {
       ctx.moveTo(-12, -4); ctx.lineTo(12, -4); ctx.lineTo(9, 0); ctx.lineTo(-9, 0); ctx.closePath(); ctx.fill();
-      ctx.fillRect(-0.5, -26, 1, 22);
-      ctx.fillStyle = s.lit ? '#e8eef0' : '#22364a';
+      ctx.fillRect(-0.7, -26, 1.4, 22);
+      ctx.fillStyle = sail;
       ctx.beginPath(); ctx.moveTo(1.5, -25); ctx.lineTo(1.5, -6); ctx.lineTo(14, -6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = light;
+      ctx.beginPath(); ctx.moveTo(-1.5, -22); ctx.lineTo(-1.5, -6); ctx.lineTo(-11, -6); ctx.closePath(); ctx.fill();
       lx = 0; ly = -28;
     }
     ctx.restore();
     s.y0 = s.y + bob; s.sc = sc; s.hit = 38 * sc;
-    var rgb = s.bonus && !s.done ? '255,214,138' : s.done ? '140,230,170' : '255,244,207';
-    var a = s.bonus && !s.done ? 0.6 + 0.4 * Math.sin(t * 5) : 0.8;
-    lightDot(s.x + s.dir * lx * sc, s.y0 + ly * sc, 1.7 * sc, rgb, a);
+    var rgb = s.bonus && !s.done ? '242,193,78' : s.done ? '140,230,170' : '255,244,207';
+    lightDot(s.x + s.dir * lx * sc, s.y0 + ly * sc, 1.7 * sc, rgb, s.bonus && !s.done ? 1 : 0.8);
   }
+
   function islandTopY(fx) {
     // 岩場の上辺の高さ(おおよそ)。タコを岩に張りつかせる位置に使う。
     if (fx > 0.5) fx = 1 - fx;
@@ -1582,93 +2107,115 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     if (fx < 0.42) return VH * (0.88 - 0.08 * (fx - 0.28) / 0.14);
     return VH * 0.8;
   }
-  function drawIsland() {
-    var g = ctx.createLinearGradient(0, VH * 0.8, 0, VH * 1.15);
-    g.addColorStop(0, '#14293a'); g.addColorStop(1, '#08131d');
-    ctx.fillStyle = g;
+  function islandPath(dx, dy) {
     ctx.beginPath();
-    ctx.moveTo(W * 0.06, H); ctx.lineTo(W * 0.12, VH * 1.02); ctx.lineTo(W * 0.28, VH * 0.88);
-    ctx.quadraticCurveTo(W * 0.36, VH * 0.8, W * 0.42, VH * 0.8);
-    ctx.lineTo(W * 0.58, VH * 0.8);
-    ctx.quadraticCurveTo(W * 0.64, VH * 0.8, W * 0.72, VH * 0.88);
-    ctx.lineTo(W * 0.88, VH * 1.02); ctx.lineTo(W * 0.94, H); ctx.closePath(); ctx.fill();
-    // 灯りに照らされた岩の縁
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(W * 0.2, VH * 0.95); ctx.lineTo(W * 0.28, VH * 0.88);
-    ctx.quadraticCurveTo(W * 0.36, VH * 0.8, W * 0.42, VH * 0.8);
-    ctx.lineTo(W * 0.58, VH * 0.8);
-    ctx.quadraticCurveTo(W * 0.64, VH * 0.8, W * 0.72, VH * 0.88);
-    ctx.lineTo(W * 0.8, VH * 0.95);
-    var rim = ctx.createLinearGradient(W * 0.2, 0, W * 0.8, 0);
-    rim.addColorStop(0, 'rgba(255,214,138,0)');
-    rim.addColorStop(0.5, 'rgba(255,214,138,0.32)');
-    rim.addColorStop(1, 'rgba(255,214,138,0)');
-    ctx.strokeStyle = rim; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.restore();
+    ctx.moveTo(W * 0.06 + dx, H); ctx.lineTo(W * 0.12 + dx, VH * 1.02 + dy); ctx.lineTo(W * 0.28 + dx, VH * 0.88 + dy);
+    ctx.quadraticCurveTo(W * 0.36 + dx, VH * 0.8 + dy, W * 0.42 + dx, VH * 0.8 + dy);
+    ctx.lineTo(W * 0.58 + dx, VH * 0.8 + dy);
+    ctx.quadraticCurveTo(W * 0.64 + dx, VH * 0.8 + dy, W * 0.72 + dx, VH * 0.88 + dy);
+    ctx.lineTo(W * 0.88 + dx, VH * 1.02 + dy); ctx.lineTo(W * 0.94 + dx, H); ctx.closePath();
   }
+  function drawIsland() {
+    var ph = dayBlend();
+    // 版のずれ：もう一色を少しずらして先に刷る
+    ctx.globalAlpha = 0.8; ctx.fillStyle = pc('isleGhost', ph); islandPath(3, 2); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = pc('isle', ph); islandPath(0, 0); ctx.fill();
+    // 岩肌の彫り跡
+    ctx.strokeStyle = 'rgba(255,240,220,0.14)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.3, VH * 0.9); ctx.quadraticCurveTo(W * 0.33, VH * 0.875, W * 0.36, VH * 0.89);
+    ctx.moveTo(W * 0.64, VH * 0.86); ctx.quadraticCurveTo(W * 0.67, VH * 0.845, W * 0.7, VH * 0.86);
+    ctx.moveTo(W * 0.44, VH * 0.95); ctx.quadraticCurveTo(W * 0.47, VH * 0.935, W * 0.5, VH * 0.95);
+    ctx.stroke();
+  }
+
   // ---------- 設備が景色に現れる ----------
   function nightness() { var ph = dayBlend(); return lerpN(STAR_VIS[ph.from], STAR_VIS[ph.to], ph.t); }
   function drawHut(t) {
     // 見習い灯台守: 岩場に灯台守の小屋。窓に灯りがともる
     if (!state || state.owned.keeper < 1) return;
+    var ph = dayBlend();
     var fx = 0.355, x = W * fx, y = islandTopY(fx) + 3;
     var hw = W * 0.075, hh = VH * 0.05;
-    ctx.fillStyle = '#1b3043';
+    ctx.fillStyle = pc('tower', ph);
     ctx.fillRect(x - hw / 2, y - hh, hw, hh);
-    ctx.fillStyle = '#0f1d2a';
-    ctx.beginPath(); ctx.moveTo(x - hw / 2 - 3, y - hh); ctx.lineTo(x, y - hh - VH * 0.03); ctx.lineTo(x + hw / 2 + 3, y - hh); ctx.closePath(); ctx.fill();
-    ctx.fillRect(x + hw * 0.18, y - hh - VH * 0.03, 3, VH * 0.02);
-    var n = nightness(), wa = 0.55 + 0.4 * n + (reduce ? 0 : 0.05 * Math.sin(t * 3));
-    var ww = hw * 0.22, wh = hh * 0.36;
-    ctx.fillStyle = 'rgba(255,214,138,' + wa + ')';
-    ctx.fillRect(x - hw * 0.28, y - hh * 0.68, ww, wh);
+    ctx.fillStyle = pc('band', ph);
+    ctx.beginPath(); ctx.moveTo(x - hw / 2 - 3, y - hh); ctx.lineTo(x, y - hh - VH * 0.035); ctx.lineTo(x + hw / 2 + 3, y - hh); ctx.closePath(); ctx.fill();
+    var n = nightness();
+    var ww = hw * 0.26, wh = hh * 0.42;
+    ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#33261F';
+    ctx.fillRect(x - hw * 0.28, y - hh * 0.7, ww, wh);
     if (n > 0.3) {
-      ctx.globalCompositeOperation = 'lighter';
-      lightDot(x - hw * 0.28 + ww / 2, y - hh * 0.68 + wh / 2, 1, '255,214,138', 0.35 * n);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.22 * n * (reduce ? 1 : 0.9 + 0.1 * Math.sin(t * 3));
+      ctx.beginPath(); ctx.arc(x - hw * 0.28 + ww / 2, y - hh * 0.7 + wh / 2, hw * 0.4, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  var PATH_LAMP_X = [0.25, 0.68, 0.3, 0.73, 0.21, 0.63];
+  function drawPathLamps(t) {
+    // 石油ランプ：岬の小径に小さな灯が並ぶ（持っている数で増える）
+    if (!state || state.owned.lamp < 1) return;
+    var count = Math.min(6, 1 + Math.floor(Math.log(state.owned.lamp) / Math.log(2)));
+    var n = nightness();
+    for (var i = 0; i < count; i++) {
+      var fx = PATH_LAMP_X[i], x = W * fx, y = islandTopY(fx) + 2;
+      if (n > 0.3) {
+        ctx.globalAlpha = 0.22 * n * (reduce ? 1 : 0.85 + 0.15 * Math.sin(t * 2.6 + i * 1.7));
+        ctx.fillStyle = '#F2C14E';
+        ctx.beginPath(); ctx.arc(x, y - 13, 8, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = '#33261F'; ctx.fillRect(x - 0.8, y - 10, 1.6, 10);
+      ctx.fillStyle = n > 0.3 ? '#F2C14E' : '#E8D7A8';
+      ctx.fillRect(x - 2.5, y - 16, 5, 6);
+      ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 16, 5, 6);
     }
   }
   function drawPier(t) {
     // 潮力発電所: 右の岩場から防波堤がのび、灯りが並ぶ
     if (!state || state.owned.plant < 1) return;
+    var ph = dayBlend();
     var y0 = VH * 0.93, x0 = W * 0.76, x1 = W * 1.04;
-    ctx.fillStyle = '#0e1c28';
+    ctx.fillStyle = pc('isle', ph);
     ctx.beginPath();
     ctx.moveTo(x0, y0 - 3); ctx.lineTo(x1, y0 - 5); ctx.lineTo(x1, y0 + 4); ctx.lineTo(x0, y0 + 6); ctx.closePath(); ctx.fill();
     var n = Math.max(0.35, nightness());
     var count = Math.min(6, 2 + Math.floor(Math.log(1 + state.owned.plant) / Math.log(2)));
     for (var i = 0; i < count; i++) {
       var fx = (i + 0.5) / count, lx = x0 + (x1 - x0 - W * 0.04) * fx, ly = y0 - 4 - fx * 2;
-      ctx.fillStyle = '#0e1c28'; ctx.fillRect(lx - 0.5, ly - 8, 1, 8);
-      var a = n * (0.7 + (reduce ? 0 : 0.3 * Math.sin(t * 2 + i)));
-      ctx.globalCompositeOperation = 'lighter';
-      lightDot(lx, ly - 9, 1.2, '170,220,255', a);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = pc('isle', ph); ctx.fillRect(lx - 0.7, ly - 8, 1.4, 8);
+      ctx.globalAlpha = n * (0.75 + (reduce ? 0 : 0.25 * Math.sin(t * 2 + i)));
+      ctx.fillStyle = '#F3E6C4';
+      ctx.beginPath(); ctx.arc(lx, ly - 9, 2.2, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
+
   var TURBINE_X = [0.86, 0.1, 0.94, 0.19, 0.78];
   function drawTurbines(t) {
     // 洋上風力発電: 水平線に風車が増えていく。羽が回り、赤い航空灯が点滅する
     if (!state || state.owned.wind < 1) return;
     var count = Math.min(5, 1 + Math.floor(Math.log(state.owned.wind) / Math.log(2)));
-    var h = VH * 0.075, blade = VH * 0.032;
+    var h = VH * 0.075, blade = VH * 0.032, n = nightness();
+    var col = n > 0.5 ? '#F3E6C4' : '#FBF6EA';
     for (var i = 0; i < count; i++) {
       var x = W * TURBINE_X[i], base = horizon + 1, hubY = base - h;
-      ctx.strokeStyle = 'rgba(200,215,225,0.55)'; ctx.lineWidth = 1.4;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, hubY); ctx.stroke();
       var ang = (reduce ? 0.6 : t * (0.9 + i * 0.07)) + i * 1.3;
-      ctx.lineWidth = 1.1;
+      ctx.lineWidth = 1.6;
       for (var k = 0; k < 3; k++) {
         var a = ang + k * 2.094;
         ctx.beginPath(); ctx.moveTo(x, hubY); ctx.lineTo(x + Math.cos(a) * blade, hubY + Math.sin(a) * blade); ctx.stroke();
       }
-      var blink = reduce ? 0.6 : (Math.sin(t * 2.4 + i * 0.9) > 0.6 ? 1 : 0.15);
-      ctx.globalCompositeOperation = 'lighter';
-      lightDot(x, hubY - 1, 1.1, '255,90,80', blink * Math.max(0.4, nightness()));
-      ctx.globalCompositeOperation = 'source-over';
+      var blink = reduce ? 0.7 : (Math.sin(t * 2.4 + i * 0.9) > 0.6 ? 1 : 0.25);
+      ctx.globalAlpha = blink; ctx.fillStyle = '#E2643F';
+      ctx.beginPath(); ctx.arc(x, hubY - 1, 1.8, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
+
   function drawSatellite(t) {
     // 人工衛星管制局: 夜空をゆっくり横切る衛星の光
     if (!state || state.owned.satellite < 1) return;
@@ -1683,7 +2230,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     ctx.globalCompositeOperation = 'source-over';
   }
   function drawFog(t) {
-    // 霧笛: ときどき海に霧が流れてくる
+    // 霧笛: ときどき海に霧が流れてくる（淡い紙色の帯）
     if (fog <= 0.01) return;
     for (var j = 0; j < 3; j++) {
       var sp = reduce ? 0 : 10 + j * 6, span = W * 1.6;
@@ -1693,13 +2240,15 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       ctx.save();
       ctx.translate(cx, cy); ctx.scale(1, ch / cw);
       var g = ctx.createRadialGradient(0, 0, 0, 0, 0, cw);
-      g.addColorStop(0, 'rgba(205,220,230,' + (0.28 * fog) + ')');
-      g.addColorStop(1, 'rgba(205,220,230,0)');
+      g.addColorStop(0, 'rgba(236,231,220,' + (0.42 * fog) + ')');
+      g.addColorStop(0.7, 'rgba(236,231,220,' + (0.3 * fog) + ')');
+      g.addColorStop(1, 'rgba(236,231,220,0)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(0, 0, cw, 0, 6.283); ctx.fill();
       ctx.restore();
     }
   }
+
   function updateScenery(dt) {
     var target = rankIdx(rangeNow);
     towerGrow += (target - towerGrow) * Math.min(1, dt * 1.2);
@@ -1828,16 +2377,24 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     c.y0 = c.y - 6 * s; c.sc = s; c.hit = 30 * s;
   }
   function towerOff() { return (5 - towerGrow) * 0.028 * VH; }
-  function drawTower() {
-    var off = towerOff();
-    var topY = VH * 0.33 + off, baseY = VH * 0.8, tw1 = W * 0.032, tw2 = W * 0.05, len = baseY - topY;
-    ctx.save();
+  function towerBody(off, dx, dy) {
+    var topY = VH * 0.33 + off + dy, baseY = VH * 0.8 + dy, tw1 = W * 0.032, tw2 = W * 0.05;
     ctx.beginPath();
-    ctx.moveTo(lampX - tw1, topY); ctx.lineTo(lampX + tw1, topY);
-    ctx.lineTo(lampX + tw2, baseY); ctx.lineTo(lampX - tw2, baseY); ctx.closePath();
-    ctx.clip();
-    ctx.fillStyle = '#e9eef0'; ctx.fillRect(0, topY, W, len);
-    ctx.fillStyle = '#b9483a';
+    ctx.moveTo(lampX - tw1 + dx, topY); ctx.lineTo(lampX + tw1 + dx, topY);
+    ctx.lineTo(lampX + tw2 + dx, baseY); ctx.lineTo(lampX - tw2 + dx, baseY); ctx.closePath();
+  }
+  function drawTower() {
+    var off = towerOff(), ph = dayBlend();
+    var topY = VH * 0.33 + off, baseY = VH * 0.8, len = baseY - topY;
+    var lw = W * 0.027 * (towerGrow >= 4 ? 1.12 : 1), ltop = VH * 0.255 + off, lh = VH * 0.07;
+    // 版のずれ：塔と灯室の影を少しずらして先に刷る
+    ctx.fillStyle = pc('towerGhost', ph);
+    towerBody(off, 3, 2); ctx.fill();
+    ctx.fillRect(lampX - lw - 4 + 3, ltop + 2, lw * 2 + 8, lh);
+    ctx.save();
+    towerBody(off, 0, 0); ctx.clip();
+    ctx.fillStyle = pc('tower', ph); ctx.fillRect(0, topY, W, len);
+    ctx.fillStyle = pc('band', ph);
     if (towerGrow >= 2) {
       // 格が上がると赤い帯が2本になる
       ctx.fillRect(0, topY + len * 0.2, W, len * 0.13);
@@ -1845,36 +2402,64 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     } else {
       ctx.fillRect(0, topY + len * 0.4, W, len * 0.18);
     }
-    ctx.fillStyle = 'rgba(20,40,60,0.2)'; ctx.fillRect(lampX, topY, W, len);
+    ctx.fillStyle = 'rgba(51,38,31,0.08)'; ctx.fillRect(lampX, topY, W, len);
     ctx.restore();
-    ctx.fillStyle = '#2a3b4d';
+    var ink = '#33261F';
+    ctx.fillStyle = ink;
     ctx.fillRect(lampX - W * 0.045, VH * 0.325 + off, W * 0.09, 4);
-    var lw = W * 0.027 * (towerGrow >= 4 ? 1.12 : 1), ltop = VH * 0.255 + off, lh = VH * 0.07;
-    var c = 'rgb(255,' + Math.round(214 + 30 * pulse) + ',' + Math.round(138 + 70 * pulse) + ')';
+    var c = lerpColor('#F2C14E', '#FFF4D6', Math.min(1, pulse));
     ctx.fillStyle = c; ctx.fillRect(lampX - lw, ltop, lw * 2, lh);
-    ctx.fillStyle = '#2a3b4d';
+    var cy = ltop + lh / 2;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(lampX - lw, ltop, lw * 2, lh); ctx.clip();
+    if (state && state.owned.mirror > 0) {
+      // 反射鏡：灯室の奥に銀の反射板
+      ctx.fillStyle = 'rgba(214,220,226,0.95)';
+      ctx.beginPath(); ctx.arc(lampX + lw * 0.55, cy, lw * 0.75, Math.PI / 2, Math.PI * 1.5); ctx.closePath(); ctx.fill();
+    }
+    if (state && state.owned.fresnel > 0) {
+      // フレネルレンズ：同心のプリズムの線
+      ctx.strokeStyle = 'rgba(51,38,31,0.4)'; ctx.lineWidth = 1;
+      for (var ri = 1; ri <= 3; ri++) { ctx.beginPath(); ctx.arc(lampX, cy, lw * 0.3 * ri, 0, 6.283); ctx.stroke(); }
+    }
+    ctx.restore();
+    ctx.fillStyle = ink;
     ctx.fillRect(lampX - lw, ltop, 2, lh); ctx.fillRect(lampX - 1, ltop, 2, lh); ctx.fillRect(lampX + lw - 2, ltop, 2, lh);
     if (towerGrow >= 1) {
       // 回廊の手すり
       var gy = VH * 0.325 + off, gw = W * 0.045;
-      ctx.fillStyle = '#2a3b4d';
-      ctx.fillRect(lampX - gw, gy - 7, gw * 2, 1.2);
-      for (var k = -3; k <= 3; k++) ctx.fillRect(lampX + k * gw / 3.2 - 0.6, gy - 7, 1.2, 7);
+      ctx.fillRect(lampX - gw, gy - 7, gw * 2, 1.6);
+      for (var k = -3; k <= 3; k++) ctx.fillRect(lampX + k * gw / 3.2 - 0.7, gy - 7, 1.4, 7);
     }
-    ctx.fillStyle = '#1d2c3b';
+    if (state && state.owned.horn > 0) {
+      // 霧笛：回廊に、海へ向けたラッパ
+      var hy = VH * 0.325 + off - 9, hx = lampX + W * 0.045;
+      ctx.fillStyle = '#C9A24A'; ctx.strokeStyle = ink; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(hx - 4, hy - 1.5); ctx.lineTo(hx + 6, hy - 3.5); ctx.lineTo(hx + 9, hy - 7); ctx.lineTo(hx + 9, hy + 5); ctx.lineTo(hx + 6, hy + 1.5); ctx.lineTo(hx - 4, hy + 1.5); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = ink;
     ctx.beginPath();
-    ctx.moveTo(lampX - lw - 4, ltop); ctx.lineTo(lampX, VH * 0.215 + off); ctx.lineTo(lampX + lw + 4, ltop); ctx.closePath(); ctx.fill();
-    ctx.fillRect(lampX - 1, VH * 0.2 + off, 2, VH * 0.02);
+    ctx.moveTo(lampX - lw - 4, ltop); ctx.quadraticCurveTo(lampX, VH * 0.2 + off, lampX + lw + 4, ltop); ctx.closePath(); ctx.fill();
+    ctx.fillRect(lampX - 1, VH * 0.19 + off, 2, VH * 0.03);
+    if (state && Date.now() < state.boostUntil) {
+      // 追い風：てっぺんの小旗がたなびく
+      var fy = VH * 0.19 + off, wv = reduce ? 0 : Math.sin(Date.now() / 160) * 2;
+      ctx.fillStyle = pc('band', ph);
+      ctx.beginPath(); ctx.moveTo(lampX + 1, fy); ctx.quadraticCurveTo(lampX + 9, fy + 2 + wv, lampX + 16, fy - 1 + wv);
+      ctx.lineTo(lampX + 12, fy + 4 + wv); ctx.quadraticCurveTo(lampX + 7, fy + 7, lampX + 1, fy + 6); ctx.closePath(); ctx.fill();
+    }
     if (towerGrow >= 4.5) {
       // 最上位の格では、てっぺんに金の飾り
-      lightDot(lampX, VH * 0.198 + off, 1.6, '255,214,138', 0.7);
+      ctx.fillStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(lampX, VH * 0.186 + off, 2.6, 0, 6.283); ctx.fill();
     }
   }
+
   function drawBeam(dir, len) {
     if (len < 2) return;
-    var g = ctx.createLinearGradient(lampX, lampY, lampX + dir * len, lampY);
-    g.addColorStop(0, 'rgba(255,230,170,0.75)'); g.addColorStop(1, 'rgba(255,230,170,0)');
-    ctx.fillStyle = g;
+    var n = nightness();
+    ctx.fillStyle = 'rgba(255,244,214,' + (0.28 + 0.3 * n) + ')';
     var tilt = len * 0.05;
     ctx.beginPath();
     ctx.moveTo(lampX, lampY - 2);
@@ -1882,40 +2467,110 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     ctx.lineTo(lampX + dir * len, lampY + len * 0.07 + tilt);
     ctx.lineTo(lampX, lampY + 2);
     ctx.closePath(); ctx.fill();
+    if (state && state.owned.mirror > 0) {
+      // 反射鏡があると、光線の芯がくっきりする
+      ctx.fillStyle = 'rgba(255,250,232,' + (0.25 + 0.25 * n) + ')';
+      ctx.beginPath();
+      ctx.moveTo(lampX, lampY - 1);
+      ctx.lineTo(lampX + dir * len * 0.85, lampY - len * 0.02 + tilt * 0.85);
+      ctx.lineTo(lampX + dir * len * 0.85, lampY + len * 0.02 + tilt * 0.85);
+      ctx.lineTo(lampX, lampY + 1);
+      ctx.closePath(); ctx.fill();
+    }
   }
+
   function drawGlow(flash) {
-    var r = W * 0.16 * (1 + pulse * 0.4);
-    var g = ctx.createRadialGradient(lampX, lampY, 0, lampX, lampY, r);
-    g.addColorStop(0, 'rgba(255,240,200,' + Math.min(1, 0.55 + 0.3 * flash + 0.25 * pulse) + ')');
-    g.addColorStop(0.25, 'rgba(255,214,138,0.25)');
-    g.addColorStop(1, 'rgba(255,214,138,0)');
-    ctx.fillStyle = g; ctx.fillRect(lampX - r, lampY - r, r * 2, r * 2);
+    // 灯りのまわりの、刷った円の淡い光
+    var r = W * 0.075 * (1 + pulse * 0.5);
+    ctx.fillStyle = 'rgba(255,240,200,' + Math.min(0.45, 0.1 + 0.1 * flash + 0.25 * pulse) + ')';
+    ctx.beginPath(); ctx.arc(lampX, lampY, r, 0, 6.283); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,200,' + Math.min(0.35, 0.05 + 0.2 * pulse) + ')';
+    ctx.beginPath(); ctx.arc(lampX, lampY, r * 1.7, 0, 6.283); ctx.fill();
   }
+  // 紙の粒：景色全体に重ねる（1回だけ作って模様として敷く）
+  var grainPat = null;
+  function drawGrain() {
+    if (!grainPat) {
+      var g = document.createElement('canvas'); g.width = g.height = 160;
+      var gc = g.getContext('2d'), img = gc.createImageData(160, 160), r = rng(11);
+      for (var i = 0; i < img.data.length; i += 4) {
+        var v = r();
+        img.data[i] = 51; img.data[i + 1] = 38; img.data[i + 2] = 31;
+        img.data[i + 3] = v < 0.4 ? Math.round((0.4 - v) * 55) : 0;
+      }
+      gc.putImageData(img, 0, 0);
+      grainPat = ctx.createPattern(g, 'repeat');
+    }
+    ctx.fillStyle = grainPat; ctx.fillRect(0, 0, W, VH + 12);
+  }
+
   function drawOverlays(t) {
+    // 景色の上には文字を出さない。金の船には、脈打たない静かな印（菜の花色の輪と小さな三角）だけ
     if (bonus && !bonus.done) {
-      var s = bonus, rr = (20 + (reduce ? 0 : 4 * Math.sin(t * 4))) * s.sc;
-      ctx.strokeStyle = 'rgba(255,214,138,0.85)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(s.x, s.y0 - 10 * s.sc, rr, 0, 6.283); ctx.stroke();
-      if (state.guided < 3) {
-        ctx.font = "700 12px 'Zen Kaku Gothic New', sans-serif";
-        ctx.textAlign = 'center'; ctx.fillStyle = '#ffd68a';
-        ctx.fillText('タップで導く', s.x, s.y0 - 10 * s.sc - rr - 5);
+      var s = bonus, cy = s.y0 - 10 * s.sc, rr = 22 * s.sc;
+      ctx.lineWidth = 4; ctx.strokeStyle = '#33261F';
+      ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
+      ctx.lineWidth = 2.2; ctx.strokeStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
+      ctx.fillStyle = '#F2C14E'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(s.x - 6, cy - rr - 12); ctx.lineTo(s.x + 6, cy - rr - 12); ctx.lineTo(s.x, cy - rr - 4); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+  }
+  function drawRankFx() {
+    // 格が上がった瞬間：灯台の後ろに刷った光の輪がひろがり、鳥が飛び立つ（文字は出さない）
+    if (rankFx <= 0) return;
+    var age = (1 - rankFx) * 3.2, a = Math.min(1, rankFx * 2);
+    for (var i = 0; i < 4; i++) {
+      var rad = age * 70 - i * 24;
+      if (rad <= 4) continue;
+      ctx.globalAlpha = a * 0.85; ctx.lineWidth = 6; ctx.strokeStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(lampX, lampY, rad, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = a * 0.5; ctx.lineWidth = 2; ctx.strokeStyle = '#E2643F';
+      ctx.beginPath(); ctx.arc(lampX + 3, lampY + 2, rad, 0, 6.283); ctx.stroke();
+    }
+    ctx.globalAlpha = a; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    for (var b = 0; b < 5; b++) {
+      var dir = b % 2 ? 1 : -1, bx = lampX + dir * (20 + b * 9 + age * (38 + b * 6)), by = lampY - 10 - b * 7 - age * (14 + b * 4);
+      var flap = reduce ? 0 : Math.sin(age * 12 + b) * 2;
+      ctx.beginPath(); ctx.moveTo(bx - 7, by - 3 + flap); ctx.quadraticCurveTo(bx - 3, by - 4, bx, by + 1); ctx.quadraticCurveTo(bx + 3, by - 4, bx + 7, by - 3 + flap); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawRipples() {
+    for (var i = 0; i < ripples.length; i++) {
+      var r = ripples[i], k = r.age / 0.9;
+      ctx.globalAlpha = (1 - k) * 0.7; ctx.strokeStyle = '#FFF4D6'; ctx.lineWidth = 2;
+      for (var j = 0; j < 2; j++) {
+        var rad = 4 + (k * 26) - j * 8;
+        if (rad <= 0) continue;
+        ctx.beginPath();
+        if (r.sea) ctx.ellipse(r.x, r.y, rad, rad * 0.38, 0, 0, 6.283);
+        else ctx.arc(r.x, r.y, rad * 0.6, 0, 6.283);
+        ctx.stroke();
       }
     }
-    if (creature && state.found < 3 && creature.age > 0.6 && creature.y0 != null) {
-      ctx.font = "700 12px 'Zen Kaku Gothic New', sans-serif";
-      ctx.textAlign = 'center'; ctx.fillStyle = '#ffb8d6';
-      ctx.fillText('そっとタップ', creature.x, creature.y0 - 18 * creature.sc);
+    ctx.globalAlpha = 1;
+  }
+  function drawBuyRings() {
+    for (var i = 0; i < buyRings.length; i++) {
+      var r = buyRings[i], k = r.age / 0.8, rad = 8 + 34 * k;
+      ctx.globalAlpha = (1 - k) * 0.35; ctx.fillStyle = '#FFF4D6';
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad * 0.7, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1 - k; ctx.lineWidth = 3; ctx.strokeStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, 6.283); ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#33261F';
+      ctx.beginPath(); ctx.arc(r.x + 2, r.y + 1.5, rad, 0, 6.283); ctx.stroke();
     }
-    ctx.textAlign = 'center';
-    ctx.font = "800 18px 'Shippori Mincho', serif";
-    for (var i = 0; i < floaters.length; i++) {
-      var f = floaters[i], a = Math.max(0, 1 - f.age / 0.9);
-      ctx.globalAlpha = a;
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,23,34,0.85)';
-      ctx.strokeText(f.text, f.x, f.y - f.age * 40);
-      ctx.fillStyle = '#ffd68a';
-      ctx.fillText(f.text, f.x, f.y - f.age * 40);
+    ctx.globalAlpha = 1;
+  }
+  function drawSparks() {
+    // 灯りから舞う光の粒（刷った小さな丸）
+    for (var i = 0; i < sparks.length; i++) {
+      var sk = sparks[i], a = 1 - sk.age / sk.life;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.fillStyle = '#FFF4D6';
+      ctx.beginPath(); ctx.arc(sk.x, sk.y, sk.r, 0, 6.283); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -1927,18 +2582,20 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     drawSky(t, ph); drawSatellite(t); drawSea(t, ph); drawTurbines(t);
     var c = Math.cos(theta);
     var frac = Math.max(0, Math.min(1, (rangeNow - 3) / 19));
-    var len = W * (0.28 + 0.62 * frac);
+    var len = W * (0.28 + 0.62 * frac) * (1 + 0.35 * beamKick);
     var rl = len * Math.pow(Math.max(0, c), 1.4), ll = len * Math.pow(Math.max(0, -c), 1.4);
     for (var i = 0; i < ships.length; i++) {
       var s = ships[i], d = s.x - lampX;
       s.lit = Math.abs(d) < (d > 0 ? rl : ll) * 0.95;
       drawShip(s, t);
     }
-    drawPier(t); drawIsland(); drawHut(t); drawTower(); drawCreature(t);
+    drawPier(t); drawIsland(); drawHut(t); drawPathLamps(t); drawTower(); drawCreature(t);
     drawFog(t);
+    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples(); drawRankFx();
     ctx.globalCompositeOperation = 'lighter';
-    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawRankFlash();
+    drawRankFlash();
     ctx.globalCompositeOperation = 'source-over';
+    drawGrain();
     drawOverlays(t);
   }
 
@@ -1949,21 +2606,33 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     if (c > 0 && dt > 0) gain(c * dt);
     theta += ((reduce ? 0.35 : 0.9) + 0.08 * Math.sqrt(state.owned.clock || 0)) * dt;
     pulse = Math.max(0, pulse - dt * 3);
+    beamKick = Math.max(0, beamKick - dt * 2.2);
+    rankFx = Math.max(0, rankFx - dt / 3.2);
+    for (var pi = ripples.length - 1; pi >= 0; pi--) {
+      ripples[pi].age += dt;
+      if (ripples[pi].age > 0.9) ripples.splice(pi, 1);
+    }
+    for (var bi = buyRings.length - 1; bi >= 0; bi--) {
+      buyRings[bi].age += dt;
+      if (buyRings[bi].age > 0.8) buyRings.splice(bi, 1);
+    }
+    for (var si = sparks.length - 1; si >= 0; si--) {
+      var sk = sparks[si];
+      sk.age += dt; sk.x += sk.vx * dt; sk.y += sk.vy * dt; sk.vy += 40 * dt;
+      if (sk.age > sk.life) sparks.splice(si, 1);
+    }
     dayT += dt;
     var ph2 = dayBlend();
     var golden = goldenActive();
-    if (golden && !goldenWas) toast('凪の恵み：しばらく光の産出が1.5倍になります', 4200);
+    if (golden && !goldenWas && state.tut.seen.golden) toast('凪の恵み：しばらく光×1.5', 3600, 2, 'golden');
     goldenWas = golden;
     updateShoot(dt, ph2);
     updateScenery(dt);
     updateShips(dt);
     updateCreature(dt);
-    for (var i = floaters.length - 1; i >= 0; i--) {
-      floaters[i].age += dt;
-      if (floaters[i].age > 0.9) floaters.splice(i, 1);
-    }
   }
   function frame() {
+    if (coachNow) placeCoach();
     var now = Date.now(), dt = (now - last) / 1000;
     last = now;
     if (dt < 0) dt = 0;
@@ -1988,7 +2657,9 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
         var cdx = x - creature.x, cdy = y - creature.y0;
         if (Math.sqrt(cdx * cdx + cdy * cdy) < creature.hit) { e.preventDefault(); pokeCreature(); return; }
       }
-      if (Math.abs(x - lampX) < W * 0.09 && y > VH * 0.19 && y < VH * 0.82) { e.preventDefault(); polish(); }
+      if (Math.abs(x - lampX) < W * 0.09 && y > VH * 0.19 && y < VH * 0.82) { e.preventDefault(); polish(); return; }
+      // 何もない海や空：小さな波紋だけ返す（反応のない場所をなくす）
+      if (!reduce && y < VH) { ripples.push({ x: x, y: y, age: 0, sea: y > horizon }); if (ripples.length > 8) ripples.shift(); }
     });
     // 磨くボタンは長押しで連打できる(押し続けると毎秒6回ほど)
     var pb = $('polish'), holdWait = 0, holdRepeat = 0;
@@ -2005,13 +2676,31 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     pb.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     window.addEventListener('blur', stopHold);
     pb.addEventListener('click', function (e) { if (e.detail === 0) polish(); });
-    $('guide').addEventListener('click', guide);
-    $('bgmBtn').addEventListener('click', toggleBgm);
+    $('guideBtn').addEventListener('click', guide);
+    // 音：見出しのアイコンで小さな切り替えを開く（手帳のメニューにも同じ切り替え）
+    $('bgmBtn').addEventListener('click', function () {
+      var pn = $('sndPanel'), open = pn.hidden;
+      pn.hidden = !open; $('bgmBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+      audioReady();
+    });
+    ['sndAmb', 'sndAmb2'].forEach(function (id) { $(id).addEventListener('click', function () { setSound('bgm'); }); });
+    ['sndSfx', 'sndSfx2'].forEach(function (id) { $(id).addEventListener('click', function () { setSound('sfx'); }); });
+    document.addEventListener('pointerdown', function (e) {
+      // 音の準備は、最初に画面に触れたときに（ブラウザの決まり）
+      if (audioReady() && state.snd.bgm && !ambNodes) applySound();
+      var pn = $('sndPanel');
+      if (!pn.hidden && !pn.contains(e.target) && !$('bgmBtn').contains(e.target)) { pn.hidden = true; $('bgmBtn').setAttribute('aria-expanded', 'false'); }
+    }, true);
     $('rankBtn').addEventListener('click', function () {
       var ri = rankIdx(rangeNow);
-      toast(RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
+      toast(RANKS[ri][2], 5000, 2, 'rankinfo');
     });
-    $('boostBtn').addEventListener('click', function () { showRewardedAd(startBoost); });
+    $('boostBtn').addEventListener('click', function () {
+      if ($('boostBtn').getAttribute('aria-disabled') === 'true' || !adUsable()) return;
+      showRewardedAd(startBoost);
+    });
+    window.addEventListener('online', function () { renderAll(); });
+    window.addEventListener('offline', function () { renderAll(); });
     $('adGo').addEventListener('click', function () { closeAd(true); });
     $('adCancel').addEventListener('click', function () { closeAd(false); });
     document.addEventListener('keydown', function (e) {
@@ -2022,7 +2711,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     function showTab(gen) {
       tg.setAttribute('aria-selected', gen ? 'true' : 'false');
       tu.setAttribute('aria-selected', gen ? 'false' : 'true');
-      genList.hidden = !gen; upList.hidden = gen; qtyEl.hidden = !gen;
+      genList.hidden = !gen; upList.hidden = gen; qtyEl.hidden = !gen || !state.ui.qty;
     }
     tg.addEventListener('click', function () { showTab(true); });
     tu.addEventListener('click', function () { showTab(false); });
@@ -2035,19 +2724,48 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       renderAll();
     });
 
+    // 案内のボタン
+    $('coachSkip').addEventListener('click', function () {
+      // とばす：はじめの流れならまとめて終わりに、一言ならそれだけ閉じる
+      if (!coachNow) return;
+      if (coachNow.kind === 'core') { state.tut.core = 99; state.tut.replay = 0; coachNow = null; $('coach').hidden = true; save(); }
+      else coachClose(true);
+    });
+    $('coachNext').addEventListener('click', function () { coachClose(true); renderAll(); });
+    $('welcomeOk').addEventListener('click', function () { clearInterval(welcomeTimer); $('welcome').hidden = true; renderAll(); });
+    window.addEventListener('resize', function () { placeCalls(); placeCoach(); });
+    // 手帳のメニュー（別ページ）
+    var menuBtn = $('menuBtn'), menuPage = $('menuPage');
+    function openMenu(open) {
+      menuPage.hidden = !open;
+      menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) { renderAll(); $('menuClose').focus(); } else { menuBtn.focus(); }
+    }
+    menuBtn.addEventListener('click', function () { openMenu(menuPage.hidden); });
+    $('menuClose').addEventListener('click', function () { openMenu(false); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !menuPage.hidden && $('adLayer').hidden) openMenu(false);
+    });
+    $('tutReplay').addEventListener('click', function () {
+      state.tut = { core: 0, ship: state.tut.ship, seen: {}, replay: 1 };
+      openMenu(false);
+      renderAll();
+    });
     $('resetBtn').addEventListener('click', function () { $('resetAsk').hidden = false; $('resetBtn').hidden = true; });
     $('resetNo').addEventListener('click', function () { $('resetAsk').hidden = true; $('resetBtn').hidden = false; });
     $('resetYes').addEventListener('click', function () {
       try { localStorage.removeItem(KEY); } catch (e) {}
-      state = fresh(); upSig = null; floaters = []; theta = 0; nextBonus = 10;
+      state = fresh(); upSig = null; theta = 0; nextBonus = 10;
       seedShips(); renderAll();
       $('resetAsk').hidden = true; $('resetBtn').hidden = false;
-      toast('最初から始めます。灯りをタップしよう。', 3600);
+      toast('最初から始めます', 2600, 2);
+      applySound();
+      openMenu(false);
     });
 
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) { stopHold(); if (state) save(); }
-      bgmOnHidden(document.hidden);
+      soundOnHidden(document.hidden);
     });
     window.addEventListener('pagehide', function () { if (state) save(); });
     if (window.ResizeObserver) new ResizeObserver(resize).observe(cv);
@@ -2060,6 +2778,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
     state = loaded || fresh();
     buildGens();
     bind();
+    watchBannerAd();
     resize();
     if (!W) { W = 400; H = 600; VH = 300; horizon = VH * 0.6; lampX = W * 0.5; lampY = VH * 0.29; }
     rangeNow = rangeOf(state.total);
@@ -2073,6 +2792,7 @@ h1 { margin: 0; font: 800 19px/1 var(--font-display); letter-spacing: 0.16em; }
       if (dt > 10) away(dt);
     }
     renderAll();
+    applySound();
     requestAnimationFrame(frame);
   }
 
