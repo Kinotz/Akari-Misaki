@@ -891,7 +891,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'qty', when: function () { return state.ui.qty && !$('qty').hidden; }, el: 'qty', text: 'まとめて買える（×10・最大）', auto: 5000 },
     { id: 'boost', when: function () { return !$('boostBtn').hidden && !(state.boostUntil > Date.now()); }, el: 'boostBtn', text: '広告を見ると、3分間 光×2', auto: 5000 },
     { id: 'golden', when: function () { return goldenActive(); }, el: 'cps', text: '凪の恵み：しばらく光×1.5', auto: 5000 },
-    { id: 'fog', when: function () { return fog > 0.3; }, el: null, text: '霧笛が鳴った。霧の中の船に岬を知らせる', auto: 5000 }
+    { id: 'fog', when: function () { return fog > 0.3; }, el: null, text: '霧笛が鳴った。霧のあいだは金の船が来やすい', auto: 5000 }
   ];
   // はじめの案内を最後まで終えたその場で一度だけ、物差しの右端の灯台を指す（保存しない）
   var TUT_GOAL = { id: 'goal', el: 'goalRoute', text: '右端の灯台が、最後の目標（22海里）', auto: 6000 };
@@ -1999,6 +1999,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     mirror: { name: '鏡職人の船', call: '鏡職人の船が通ります',   w: 15, sec: 15, x: 30, what: '磨く力', tag: '磨', col: '#7DB9E0' }
   };
   var SHIP_SEC = 45, SHIP_MIN = 30;
+  // 霧の夜：霧笛を持っていると霧が出る。霧のあいだは次の金の船までの時間が FOG_SHIP_RATE 倍の速さで進む
+  var FOG_SHIP_RATE = 2;
   function buffOn(k) { return !!state && state.buff[k] > Date.now(); }
   function buffLeft(k) { return Math.max(0, Math.ceil((state.buff[k] - Date.now()) / 1000)); }
   function shipSec(k) { return SHIP_KINDS[k].sec; }
@@ -2064,7 +2066,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ambientTimer = 2 + Math.random() * 4;
     }
     if (!bonus) {
-      nextBonus -= dt;
+      nextBonus -= dt * (fogLeft > 0 ? FOG_SHIP_RATE : 1);
       if (nextBonus <= 0) spawnShip(true);
     }
   }
