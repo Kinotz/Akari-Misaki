@@ -65,7 +65,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 /* ---------- 下半分：灯台守の手帳（紙） ---------- */
 .sheet {
   position: fixed; z-index: 1;
-  top: 50%; bottom: 0; left: 50%; transform: translateX(-50%);
+  /* 上端は画面の高さから JS が決める（--sheet-top）。買い物リストが背の低い画面でも3行以上見えるように */
+  top: var(--sheet-top, 50%); bottom: 0; left: 50%; transform: translateX(-50%);
   width: min(100%, 560px);
   display: flex; flex-direction: column;
   background: var(--grain), var(--paper);
@@ -77,24 +78,25 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 .vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .sheet-head {
-  flex: none; display: flex; align-items: center; gap: 2px;
-  padding: 4px max(4px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  flex: none; display: flex; align-items: center; gap: 2px; min-height: 44px;
+  padding: 0 max(4px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
 }
 .rank {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-  cursor: pointer; background: none; border: 0; padding: 4px 0; text-align: left; color: var(--ink-b);
+  flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 8px;
+  cursor: pointer; background: none; border: 0; padding: 0; text-align: left; color: var(--ink-b);
 }
-.rank b { font: 700 17px/1.3 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.rank b { flex: 0 1 auto; min-width: 0; font: 700 16px/1.3 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank .steps { flex: none; }
 /* 格が上がった瞬間：見出しの上に、お知らせ色の告知を数秒だけ */
 .sheet-head { position: relative; }
 .rank-news {
-  position: absolute; z-index: 2; left: max(12px, env(safe-area-inset-left, 0px)); right: 100px; top: 4px; bottom: 0;
-  display: flex; flex-direction: column; justify-content: center; padding: 2px 12px;
+  position: absolute; z-index: 2; left: max(12px, env(safe-area-inset-left, 0px)); right: 96px; top: 4px; bottom: 2px;
+  display: flex; align-items: center; padding: 0 10px; white-space: nowrap; overflow: hidden;
   background: var(--nano); border: 2.5px solid var(--ink-b); box-shadow: 4px 3px 0 var(--accent); color: var(--ink-b);
   animation: newsIn 0.35s ease-out;
 }
-.rank-news small { font-size: 13px; font-weight: 700; line-height: 1.3; }
-.rank-news b { font-size: 18px; font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-news small { flex: none; font-size: 15px; font-weight: 700; }
+.rank-news b { min-width: 0; font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
 @keyframes newsIn { 0% { transform: translateY(-6px) scale(0.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
 /* 次の格までの進み：点が一つずつ塗られていき、最後に小さな灯台 */
 .steps { display: flex; align-items: center; gap: 5px; }
@@ -129,13 +131,13 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) 2px max(16px, env(safe-area-inset-left, 0px));
 }
 .bank { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.bank strong { font: 700 38px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bank strong { font: 700 34px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .bank .cps { margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
 .bank .cps em { font-style: normal; font-weight: 700; margin-left: 6px; }
 
 /* 次の目標（1行） */
 .goal {
-  flex: none; display: flex; align-items: center; gap: 8px; font-size: 15px; min-height: 48px;
+  flex: none; display: flex; align-items: center; gap: 8px; font-size: 15px; height: 36px; white-space: nowrap; overflow: hidden;
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
   border-bottom: 2.5px solid var(--ink-b);
 }
@@ -146,8 +148,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .sheet-body {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  display: flex; flex-direction: column; gap: 16px;
-  padding: 4px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px));
 }
 .sheet-body::-webkit-scrollbar { display: none; }
 .sheet-body > * { min-width: 0; flex: none; }
@@ -159,7 +161,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* 追い風(広告ブースト)：青緑のボタン。広告が使えるときだけ出す。吹いている間は同じ場所で残り時間を見せる */
 .boost {
-  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 52px; padding: 0 12px;
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 0 12px;
   background: var(--teal); color: var(--on); border: 0; border-radius: 0; box-shadow: 3px 2px 0 var(--ink-b);
   text-align: left; cursor: pointer;
 }
@@ -171,7 +173,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* 設備・強化 */
 .shop { display: flex; flex-direction: column; }
-.tabs { display: flex; align-items: center; gap: 4px; border-bottom: 2.5px solid var(--ink-b); padding-bottom: 6px; }
+.tabs { display: flex; align-items: center; gap: 4px; border-bottom: 2.5px solid var(--ink-b); padding-bottom: 4px; }
 .tab {
   background: none; border: 0; padding: 6px 10px; cursor: pointer; border-radius: 0;
   font: 700 15px/1.2 var(--font-display); color: var(--ink-b); white-space: nowrap;
@@ -189,17 +191,17 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .list { display: flex; flex-direction: column; }
 .row {
   display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px;
-  min-height: 52px; border-bottom: 2px dotted var(--rule);
+  min-height: 50px; border-bottom: 2px dotted var(--rule);
 }
 .row-main {
-  display: flex; align-items: center; gap: 8px; min-height: 48px; min-width: 0; padding: 0;
+  display: flex; align-items: center; gap: 8px; min-height: 46px; min-width: 0; padding: 0;
   background: none; border: 0; text-align: left; color: var(--ink-b); cursor: pointer;
 }
 .row-main .name { font: 700 16px/1.35 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-main .own { margin-left: auto; font-size: 15px; }
 /* 値段の札：買える＝色で塗り＋白文字＋墨茶のずれ影／買えない＝紙の地＋墨茶の枠線（塗りなし） */
 .price {
-  min-width: 88px; height: 40px; padding: 0 8px; border: 2.5px solid var(--ink-b); border-radius: 0;
+  min-width: 88px; height: 38px; padding: 0 8px; border: 2.5px solid var(--ink-b); border-radius: 0;
   background: transparent; color: var(--ink-b); font: 700 16px/1 var(--font-display); font-variant-numeric: tabular-nums;
   transform: rotate(-1.2deg); cursor: pointer; white-space: nowrap;
 }
@@ -265,16 +267,17 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* お知らせ：次の目標の行に重ねて1件ずつ出す（磨く・買う・追い風のボタンにはかぶせない） */
 .toast, .call {
-  position: absolute; z-index: 3; left: 0; right: 0; top: var(--goal-top, 150px); height: var(--goal-h, 48px);
+  position: absolute; z-index: 3; left: 0; right: 0; top: var(--goal-top, 150px); height: var(--goal-h, 36px);
   display: flex; align-items: center; gap: 10px;
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
   background: var(--nano); border-top: 2.5px solid var(--ink-b); border-bottom: 2.5px solid var(--ink-b); color: var(--ink-b);
   font-size: 15px; font-weight: 700; line-height: 1.4;
 }
 .toast { z-index: 4; pointer-events: none; }
-.call span { flex: 1; min-width: 0; }
+.call span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.call-btn::before { content: ""; position: absolute; left: -6px; right: -6px; top: -10px; bottom: -4px; }   /* 押せる範囲を上へ広げる（下は追い風ボタンにかからない） */
 .call-btn {
-  flex: none; min-width: 72px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 0; cursor: pointer;
+  position: relative; flex: none; min-width: 72px; height: 30px; padding: 0 12px; border: 0; border-radius: 0; cursor: pointer;
   background: var(--accent); color: var(--on); font-weight: 700; font-size: 16px; box-shadow: 3px 2px 0 var(--ink-b);
 }
 /* 光の数のそばに出る「+N」 */
@@ -286,7 +289,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 @keyframes gainUp { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
 
 .polish {
-  position: relative; flex: none; width: 96px; height: 96px; border: 0; padding: 0; cursor: pointer;
+  position: relative; flex: none; width: 84px; height: 84px; border: 0; padding: 0; cursor: pointer;
   display: grid; place-items: center; align-content: center; background: none; color: var(--on);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
@@ -294,15 +297,15 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .polish .plate, .polish .ghost { position: absolute; inset: 4px; border-radius: 50%; transition: transform 0.07s ease-out; }
 .polish .plate { background: var(--accent); }
 .polish .ghost { border: 3px solid var(--ink-b); transform: translate(4px, 3px); }
-.polish span { position: relative; margin-top: -8px; font: 700 24px/1 var(--font-display); }
+.polish span { position: relative; margin-top: -6px; font: 700 22px/1 var(--font-display); }
 .polish small { position: relative; margin-top: 6px; font: 700 13px/1.2 var(--font-body); font-variant-numeric: tabular-nums; }
 /* 押した瞬間：版がつぶれて、ずれていた輪がぴたりと重なり、インクの点が散る */
 .polish .ink {
   position: absolute; inset: -10px; pointer-events: none; opacity: 0;
   background: radial-gradient(circle, var(--accent) 0 2.5px, transparent 3px) 8px 10px / 26px 30px,
               radial-gradient(circle, var(--ink-b) 0 2px, transparent 2.5px) 0 0 / 33px 27px;
-  -webkit-mask: radial-gradient(circle, transparent 0 47px, #000 48px 58px, transparent 59px);
-  mask: radial-gradient(circle, transparent 0 47px, #000 48px 58px, transparent 59px);
+  -webkit-mask: radial-gradient(circle, transparent 0 41px, #000 42px 52px, transparent 53px);
+  mask: radial-gradient(circle, transparent 0 41px, #000 42px 52px, transparent 53px);
 }
 .polish:active .plate, .polish.press .plate { transform: scale(0.9, 0.86); }
 .polish:active .ghost, .polish.press .ghost { transform: translate(0, 0) scale(0.9, 0.86); }
@@ -369,15 +372,6 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .adgo:disabled { background: transparent; color: var(--ink-b); border: 2.5px solid var(--ink-b); cursor: default; }
 .adbtns .linkbtn { align-self: center; }
 
-/* 背の低い画面では、手帳の上下を詰めて中身を多く見せる */
-@media (max-height: 740px) {
-  .bank strong { font-size: 32px; }
-  .polish { width: 84px; height: 84px; }
-}
-/* 横向きなど高さが足りないときは、手帳を少し高めから始める */
-@media (max-height: 560px) {
-  .sheet { top: 40%; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .rank-news { animation: none; }
@@ -394,7 +388,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 <main class="sheet" id="sheet" aria-label="灯台守の手帳">
   <h1 class="vh">灯りの岬</h1>
   <header class="sheet-head">
-    <div class="rank-news" id="rankNews" role="status" hidden><small>灯台の格が上がった</small><b id="rankNewsName"></b></div>
+    <div class="rank-news" id="rankNews" role="status" hidden><small>格が上がった：</small><b id="rankNewsName"></b></div>
     <button class="rank" id="rankBtn" type="button" aria-label="いまの灯台の格について">
       <b id="rankName">港の常夜灯</b>
       <span class="steps" id="rankSteps" role="img" aria-label="次の格まで"></span>
@@ -1010,6 +1004,23 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     gainAt = now;
     el.textContent = '+' + fmtNum(gainSum);
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
+  // 手帳の上端：画面の高さ（アドレスバーの出入りで変わる innerHeight）から決める。
+  // 追い風ボタンとタブが出ていても、設備がまるごと N 行（背の低い画面で3、高い画面で5）見えるように。
+  // 景色は手帳の上に見えている範囲に合わせて描き直す（resize が手帳の上端から景色の高さを測る）。
+  var ROW_H = 50;
+  function layoutSheet() {
+    var sh = $('sheet'), body = $('sheetBody');
+    if (!sh || !body) return;
+    var H = window.innerHeight || document.documentElement.clientHeight || 640;
+    var n = H < 700 ? 3 : H < 760 ? 4 : 5;
+    var need = 8 + 44 + 8 + 42 + 8 + ROW_H * n + 4;          // 余白・追い風・タブ・設備の行
+    var head = body.offsetTop;                                  // 見出し・光の数と磨く・次の目標
+    var lo = Math.min(Math.max(180, H * 0.3), H * 0.5), hi = H * 0.5;
+    var top = Math.round(Math.max(lo, Math.min(hi, H - head - need)));
+    if (sh.style.getPropertyValue('--sheet-top') === top + 'px') return;
+    sh.style.setProperty('--sheet-top', top + 'px');
+    resize(); placeCalls();
   }
   function placeCalls() {
     // お知らせと船の呼びかけを、次の目標の行にぴったり重ねる
@@ -2733,7 +2744,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     });
     $('coachNext').addEventListener('click', function () { coachClose(true); renderAll(); });
     $('welcomeOk').addEventListener('click', function () { clearInterval(welcomeTimer); $('welcome').hidden = true; renderAll(); });
-    window.addEventListener('resize', function () { placeCalls(); placeCoach(); });
+    window.addEventListener('resize', function () { layoutSheet(); placeCalls(); placeCoach(); });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', layoutSheet);
+    window.addEventListener('orientationchange', function () { setTimeout(layoutSheet, 200); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutSheet);
     // 手帳のメニュー（別ページ）
     var menuBtn = $('menuBtn'), menuPage = $('menuPage');
     function openMenu(open) {
@@ -2779,6 +2793,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     buildGens();
     bind();
     watchBannerAd();
+    layoutSheet();
     resize();
     if (!W) { W = 400; H = 600; VH = 300; horizon = VH * 0.6; lampX = W * 0.5; lampY = VH * 0.29; }
     rangeNow = rangeOf(state.total);
