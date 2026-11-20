@@ -494,7 +494,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     <section class="shop" aria-label="岬の備え">
       <div class="tabs" id="tabs" role="tablist">
         <button class="tab" id="tabGen" role="tab" aria-selected="true" aria-controls="genList" type="button">設備</button>
-        <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/17</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
+        <button class="tab" id="tabUp" role="tab" aria-selected="false" aria-controls="upList" type="button">強化<small id="upCount">0/54</small><i class="dot" id="upDot" role="img" aria-label="買えるものがあります" hidden></i></button>
         <div class="qty" id="qty" role="group" aria-label="まとめ買い">
           <button type="button" data-q="1" aria-pressed="true">×1</button>
           <button type="button" data-q="10" aria-pressed="false">×10</button>
@@ -655,7 +655,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'satellite', name: '人工衛星管制局',   desc: '軌道上の衛星が航路を見守り、灯台の役目を引き継ぐ。', base: 1700000000, cps: 240000 }
   ];
 
-  // 強化: tap=磨く力の倍率, share=磨くたび毎秒産出の割合を加算, gen=設備の倍率, all=全体の倍率
+  // 強化: tap=磨く力の倍率, share=磨くたび毎秒産出の割合を加算, gen=設備の倍率（need=その設備を何台持つと見えるか。無ければ1）, all=全体の倍率
   var UPS = [
     { id: 'cloth',     name: '柔らかい磨き布',   desc: '磨く力が2倍になる。',                       cost: 100,          tap: 2 },
     { id: 'chamois',   name: '鹿革のクロス',     desc: '磨く力がさらに2倍。',                       cost: 1000,         tap: 2 },
@@ -670,6 +670,44 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'amp',       name: '低音の増幅管',     desc: '霧笛の産出が2倍。',                         cost: 15000000,     gen: 'horn' },
     { id: 'windtech',  name: '風車の整備',       desc: '洋上風力発電の産出が2倍。',                 cost: 1800000000,   gen: 'wind' },
     { id: 'satcal',    name: '管制室の較正',     desc: '人工衛星管制局の産出が2倍。',               cost: 19000000000,  gen: 'satellite' },
+    // 段階強化：その設備を need 台持つと見える（景色の節目 10・25・50・100 と同じ）。1つにつき、その設備の産出が2倍
+    { id: 'tide',      name: '潮見表',           desc: '潮力発電所の産出が2倍。',                   cost: 180000000,    gen: 'plant' },
+    { id: 'lamp10', name: '芯切りばさみ', desc: '石油ランプの産出が2倍。', cost: 750, gen: 'lamp', need: 10 },
+    { id: 'lamp25', name: '二重の火屋', desc: '石油ランプの産出が2倍。', cost: 9000, gen: 'lamp', need: 25 },
+    { id: 'lamp50', name: '真鍮の笠', desc: '石油ランプの産出が2倍。', cost: 300000, gen: 'lamp', need: 50 },
+    { id: 'lamp100', name: '精製した灯油', desc: '石油ランプの産出が2倍。', cost: 45000000, gen: 'lamp', need: 100 },
+    { id: 'mirror10', name: '曲面の研ぎ出し', desc: '反射鏡の産出が2倍。', cost: 5000, gen: 'mirror', need: 10 },
+    { id: 'mirror25', name: '継ぎ目のない銀鏡', desc: '反射鏡の産出が2倍。', cost: 60000, gen: 'mirror', need: 25 },
+    { id: 'mirror50', name: '角度の目盛り', desc: '反射鏡の産出が2倍。', cost: 2000000, gen: 'mirror', need: 50 },
+    { id: 'mirror100', name: '星を映す鏡', desc: '反射鏡の産出が2倍。', cost: 300000000, gen: 'mirror', need: 100 },
+    { id: 'keeper10', name: '夜番の交代表', desc: '見習い灯台守の産出が2倍。', cost: 35000, gen: 'keeper', need: 10 },
+    { id: 'keeper25', name: '灯台守の寮', desc: '見習い灯台守の産出が2倍。', cost: 420000, gen: 'keeper', need: 25 },
+    { id: 'keeper50', name: '見習いの免状', desc: '見習い灯台守の産出が2倍。', cost: 14000000, gen: 'keeper', need: 50 },
+    { id: 'keeper100', name: '灯台守の家系', desc: '見習い灯台守の産出が2倍。', cost: 2100000000, gen: 'keeper', need: 100 },
+    { id: 'clock10', name: '油差しの習慣', desc: '回転機構の産出が2倍。', cost: 600000, gen: 'clock', need: 10 },
+    { id: 'clock25', name: '真鍮の重り', desc: '回転機構の産出が2倍。', cost: 7200000, gen: 'clock', need: 25 },
+    { id: 'clock50', name: '振り子の調速機', desc: '回転機構の産出が2倍。', cost: 240000000, gen: 'clock', need: 50 },
+    { id: 'clock100', name: '止まらないぜんまい', desc: '回転機構の産出が2倍。', cost: 36000000000, gen: 'clock', need: 100 },
+    { id: 'fresnel10', name: '二段目のプリズム', desc: 'フレネルレンズの産出が2倍。', cost: 6500000, gen: 'fresnel', need: 10 },
+    { id: 'fresnel25', name: '色ガラスの縁', desc: 'フレネルレンズの産出が2倍。', cost: 78000000, gen: 'fresnel', need: 25 },
+    { id: 'fresnel50', name: '水銀槽の台座', desc: 'フレネルレンズの産出が2倍。', cost: 2600000000, gen: 'fresnel', need: 50 },
+    { id: 'fresnel100', name: '光の稜線', desc: 'フレネルレンズの産出が2倍。', cost: 390000000000, gen: 'fresnel', need: 100 },
+    { id: 'horn10', name: '霧笛の調律', desc: '霧笛の産出が2倍。', cost: 70000000, gen: 'horn', need: 10 },
+    { id: 'horn25', name: '二連の圧縮機', desc: '霧笛の産出が2倍。', cost: 840000000, gen: 'horn', need: 25 },
+    { id: 'horn50', name: '遠鳴りの喇叭', desc: '霧笛の産出が2倍。', cost: 28000000000, gen: 'horn', need: 50 },
+    { id: 'horn100', name: '海鳴りと合わせる', desc: '霧笛の産出が2倍。', cost: 4200000000000, gen: 'horn', need: 100 },
+    { id: 'plant10', name: '防波堤の補強', desc: '潮力発電所の産出が2倍。', cost: 750000000, gen: 'plant', need: 10 },
+    { id: 'plant25', name: '夜潮の取水口', desc: '潮力発電所の産出が2倍。', cost: 9000000000, gen: 'plant', need: 25 },
+    { id: 'plant50', name: '大潮の送電線', desc: '潮力発電所の産出が2倍。', cost: 300000000000, gen: 'plant', need: 50 },
+    { id: 'plant100', name: '潮汐の帳面', desc: '潮力発電所の産出が2倍。', cost: 45000000000000, gen: 'plant', need: 100 },
+    { id: 'wind10', name: '羽根の角度合わせ', desc: '洋上風力発電の産出が2倍。', cost: 8000000000, gen: 'wind', need: 10 },
+    { id: 'wind25', name: '沖の変電所', desc: '洋上風力発電の産出が2倍。', cost: 96000000000, gen: 'wind', need: 25 },
+    { id: 'wind50', name: '季節風の暦', desc: '洋上風力発電の産出が2倍。', cost: 3200000000000, gen: 'wind', need: 50 },
+    { id: 'wind100', name: '風の地図', desc: '洋上風力発電の産出が2倍。', cost: 480000000000000, gen: 'wind', need: 100 },
+    { id: 'satellite10', name: '軌道の微調整', desc: '人工衛星管制局の産出が2倍。', cost: 85000000000, gen: 'satellite', need: 10 },
+    { id: 'satellite25', name: '二基目の受信盤', desc: '人工衛星管制局の産出が2倍。', cost: 1000000000000, gen: 'satellite', need: 25 },
+    { id: 'satellite50', name: '夜空の中継網', desc: '人工衛星管制局の産出が2倍。', cost: 34000000000000, gen: 'satellite', need: 50 },
+    { id: 'satellite100', name: '星座のような衛星群', desc: '人工衛星管制局の産出が2倍。', cost: 5100000000000000, gen: 'satellite', need: 100 },
     { id: 'air',       name: '澄んだ夜気',       desc: 'すべての産出が1.25倍。',                    cost: 100000,       all: 1.25 },
     { id: 'calm',      name: '凪の季節',         desc: 'すべての産出が1.5倍。',                     cost: 5000000,      all: 1.5 },
     { id: 'spring',    name: '大潮',             desc: 'すべての産出が1.75倍。',                    cost: 80000000,     all: 1.75 },
@@ -1708,7 +1746,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   function visibleUps() {
     return UPS.filter(function (u) {
-      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] > 0);
+      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] >= (u.need || 1));
     }).sort(function (a, b) { return a.cost - b.cost; });
   }
   // 強化タブは最初の強化が見えたとき、まとめ買いは設備を合計10個持ったときに出す（一度出たら出したまま）
