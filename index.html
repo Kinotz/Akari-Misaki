@@ -709,6 +709,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'satellite25', name: '二基目の受信盤', desc: '人工衛星管制局の産出が2倍。', cost: 1000000000000, gen: 'satellite', need: 25 },
     { id: 'satellite50', name: '夜空の中継網', desc: '人工衛星管制局の産出が2倍。', cost: 34000000000000, gen: 'satellite', need: 50 },
     { id: 'satellite100', name: '星座のような衛星群', desc: '人工衛星管制局の産出が2倍。', cost: 5100000000000000, gen: 'satellite', need: 100 },
+    // 船の強化：導いた金の船が guided 隻になると見える。ship=gap（間隔を x 分の1に）/ cargo（積み荷の光を x 倍）/ long（灯祭り・鏡職人を x 倍長く）
+    { id: 'flag',      name: '信号旗',           desc: '金の船が少し早く来るようになる。',         cost: 300000,       ship: 'gap',   x: 1.15, guided: 10 },
+    { id: 'pilot',     name: '水先案内人',       desc: '積み荷の船の光が1.5倍。',                  cost: 100000000,    ship: 'cargo', x: 1.5,  guided: 25 },
+    { id: 'radio',     name: '無線電信',         desc: '灯祭り・鏡職人の効き目が1.5倍長く続く。',  cost: 10000000000,  ship: 'long',  x: 1.5,  guided: 50 },
     { id: 'air',       name: '澄んだ夜気',       desc: 'すべての産出が1.25倍。',                    cost: 100000,       all: 1.25 },
     { id: 'calm',      name: '凪の季節',         desc: 'すべての産出が1.5倍。',                     cost: 5000000,      all: 1.5 },
     { id: 'spring',    name: '大潮',             desc: 'すべての産出が1.75倍。',                    cost: 80000000,     all: 1.75 },
@@ -1324,7 +1328,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if ([1, 10, 50, 100].indexOf(state.guided) >= 0) track('ship_guided', { count: state.guided });
     if ([1, 10, 50].indexOf(state.shipN[kind]) >= 0) track('ship_kind', { kind: kind, count: state.shipN[kind] });
     if (kind === 'cargo') {
-      var reward = Math.max(SHIP_MIN, cps() * SHIP_SEC);
+      var reward = Math.max(SHIP_MIN, cps() * SHIP_SEC * shipUp('cargo'));
       gain(reward);
       showGain(reward);
       toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
@@ -1768,7 +1772,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
   function visibleUps() {
     return UPS.filter(function (u) {
-      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] >= (u.need || 1));
+      return !state.ups[u.id] && state.total >= u.cost * 0.25 && (!u.gen || state.owned[u.gen] >= (u.need || 1)) && (!u.guided || state.guided >= u.guided);
     }).sort(function (a, b) { return a.cost - b.cost; });
   }
   // 強化タブは最初の強化が見えたとき、まとめ買いは設備を合計10個持ったときに出す（一度出たら出したまま）
@@ -2003,7 +2007,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var FOG_SHIP_RATE = 2;
   function buffOn(k) { return !!state && state.buff[k] > Date.now(); }
   function buffLeft(k) { return Math.max(0, Math.ceil((state.buff[k] - Date.now()) / 1000)); }
-  function shipSec(k) { return SHIP_KINDS[k].sec; }
+  function shipUp(kind) { var m = 1; UPS.forEach(function (u) { if (u.ship === kind && state.ups[u.id]) m *= u.x; }); return m; }
+  function shipSec(k) { return Math.round(SHIP_KINDS[k].sec * shipUp('long')); }
+  function shipGap() { return (25 + Math.random() * 25) / shipUp('gap'); }
   function pickShipKind() {
     if (state.guided === 0) return 'cargo';
     var w = {}, sum = 0, k;
@@ -2054,7 +2060,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       s.x += s.dir * s.speed * dt;
       var gone = (s.dir > 0 && s.x > XR + 70) || (s.dir < 0 && s.x < XL - 70);
       if (gone && s === bonus) {
-        bonus = null; nextBonus = 25 + Math.random() * 25;
+        bonus = null; nextBonus = shipGap();
         $('guide').hidden = true;
       }
       return !gone;
