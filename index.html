@@ -151,10 +151,16 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* 次の目標（1行） */
 .goal {
-  flex: none; display: flex; align-items: center; gap: 8px; font-size: 15px; height: 36px; white-space: nowrap; overflow: hidden;
-  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
-  border-bottom: 2.5px solid var(--ink-b);
+  flex: none; position: relative; display: flex; align-items: center; gap: 8px; font-size: 15px; height: 40px; white-space: nowrap; overflow: hidden;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 7px max(16px, env(safe-area-inset-left, 0px));
+  cursor: pointer;
 }
+/* 航路の物差し：3海里（左端）〜22海里（右端の灯台）。届いた所まで色の線、まだの所は墨茶の点線、格の境目に刻み */
+.route { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); right: calc(max(16px, env(safe-area-inset-right, 0px)) + 16px); bottom: 3px; height: 9px; pointer-events: none; }
+.route::before { content: ""; position: absolute; left: 0; right: 0; top: 3.5px; border-top: 2px dotted var(--ink-b); }
+.route-done { position: absolute; left: 0; top: 3px; height: 3px; width: 0; background: var(--accent); }
+.route-tick { position: absolute; top: 0; width: 2px; height: 9px; margin-left: -1px; background: var(--ink-b); }
+.route-end { position: absolute; right: -15px; bottom: -1px; width: 12px; height: 15px; color: var(--ink-b); }
 .goal b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .goal .goal-left { margin-left: auto; flex: none; }
 .goal[data-ready="true"] .goal-left { font-weight: 700; }
@@ -355,6 +361,30 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 .coach-tip.below::after { top: -20px; border-bottom: 11px solid var(--ink-b); }
 .coach-tip.above::after { bottom: -20px; border-top: 11px solid var(--ink-b); }
 .coach-tip.free::after { display: none; }
+/* 案内の途中で10秒なにもしないとき：押す場所の上に、墨茶の小さな矢印を一度だけ下ろす（脈動・光るふちは使わない） */
+.coach-arrow {
+  position: fixed; width: 0; height: 0; pointer-events: none; opacity: 0; transform: translate(-50%, 0);
+  border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 16px solid var(--ink-b);
+  filter: drop-shadow(2px 2px 0 var(--accent));
+}
+.coach-arrow.show { animation: arrowDrop 2.6s ease-out forwards; }
+@keyframes arrowDrop { 0% { opacity: 0; transform: translate(-50%, -16px); } 23% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 0); } }
+.coach-tip.nudge-up { animation: nudgeUp 0.5s ease-out; }
+.coach-tip.nudge-down { animation: nudgeDown 0.5s ease-out; }
+@keyframes nudgeUp { 50% { transform: translateY(-4px); } }
+@keyframes nudgeDown { 50% { transform: translateY(4px); } }
+
+/* 目的のカード：初めて開いたときだけ、景色の上に2行で */
+.intro {
+  position: fixed; z-index: 15; left: 50%; top: 25%; transform: translate(-50%, -50%); width: min(calc(100% - 32px), 400px);
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 12px 12px;
+  background: var(--grain), var(--paper); border: 2.5px solid var(--ink-b); box-shadow: 5px 4px 0 var(--accent);
+  color: var(--ink-b); text-align: center;
+}
+.intro p { margin: 0; font-size: 15px; line-height: 1.6; }
+.intro p b { display: block; font-size: 18px; font-weight: 700; }
+.intro-btns { display: flex; align-items: center; gap: 12px; }
+.intro .call-btn { min-width: 112px; height: 40px; }
 
 /* おかえり：留守のあいだの光を数え上げる */
 .welcome {
@@ -395,11 +425,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 .adbtns .linkbtn { align-self: center; }
 
 
+@keyframes arrowStill { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) {
   .rank-news { animation: none; }
   .gain.show { animation: none; opacity: 1; }
   .row.bought .price, .row.shake .price { animation: none; }
   .polish, .polish * { transition: none !important; animation: none !important; }
+  .coach-arrow.show { animation: arrowStill 3s step-end forwards; }
+  .coach-tip.nudge-up, .coach-tip.nudge-down { animation: none; }
 }
 </style>
 </head>
@@ -445,8 +478,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     <span id="guideText">金の船が通ります</span>
     <button class="call-btn" id="guideBtn" type="button">導く</button>
   </div>
-  <section class="goal" id="goal" aria-label="次の目標">
+  <section class="goal" id="goal" aria-label="次の目標（押すと最後の目標までの距離）" role="button" tabindex="0">
     <span>次は</span><b id="goalName">石油ランプ</b><span class="goal-left num" id="goalLeft">あと 15 光</span>
+    <span class="route" id="goalRoute" aria-hidden="true"><i class="route-done" id="routeDone"></i><i class="route-tick" style="left:15.79%"></i><i class="route-tick" style="left:36.84%"></i><i class="route-tick" style="left:57.89%"></i><i class="route-tick" style="left:78.95%"></i><svg class="route-end" viewBox="0 0 12 15" fill="currentColor"><path d="M4 5h4l1.2 10H2.8z"/><path d="M3.2 3.4h5.6v1.6H3.2z"/><path d="M4 3.4Q6 0 8 3.4z"/></svg></span>
   </section>
 
   <div class="sheet-body" id="sheetBody">
@@ -551,8 +585,17 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
 </main>
 
+<section class="intro" id="intro" role="dialog" aria-labelledby="introText" hidden>
+  <p id="introText"><b>あなたは岬の灯台守。</b>灯りを育てて、遠くの海まで光を届けよう</p>
+  <div class="intro-btns">
+    <button class="call-btn" id="introGo" type="button">はじめる</button>
+    <button class="linkbtn" id="introSkip" type="button">とばす</button>
+  </div>
+</section>
+
 <div class="coach" id="coach" hidden>
   <div class="coach-hole" id="coachHole" aria-hidden="true"></div>
+  <div class="coach-arrow" id="coachArrow" aria-hidden="true"></div>
   <div class="coach-tip" id="coachTip" role="status">
     <p id="coachText"></p>
     <div class="coach-btns">
@@ -784,7 +827,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var coachNow = null, coachShownAt = 0;
   function firstUpPrice() { var k = Object.keys(upEls)[0]; return k ? upEls[k].price : null; }
   var TUT_CORE = [
-    { id: 'polish', el: 'polish', round: true, text: '灯りを磨いて、光を集める',
+    { id: 'polish', el: 'polish', round: true, text: 'ここを押して、灯りを磨こう',
       done: function () { return state.light >= 15 || state.owned.lamp > 0; } },
     { id: 'buy', el: function () { return genEls.lamp && genEls.lamp.price; }, text: '光がたまった。石油ランプを灯す',
       done: function () { return state.owned.lamp > 0; } },
@@ -808,6 +851,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     { id: 'golden', when: function () { return goldenActive(); }, el: 'cps', text: '凪の恵み：しばらく光×1.5', auto: 5000 },
     { id: 'fog', when: function () { return fog > 0.3; }, el: null, text: '霧笛が鳴った。霧の中の船に岬を知らせる', auto: 5000 }
   ];
+  // はじめの案内を最後まで終えたその場で一度だけ、物差しの右端の灯台を指す（保存しない）
+  var TUT_GOAL = { id: 'goal', el: 'goalRoute', text: '右端の灯台が、最後の目標（22海里）', auto: 6000 };
+  var goalHintPending = false;
   function coachEl(spec) {
     if (!spec.el) return null;
     var e = typeof spec.el === 'function' ? spec.el() : $(spec.el);
@@ -819,15 +865,27 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (index + 1 >= TUT_CORE.length) track('tutorial_complete');
     else track('tutorial_step', { step: index + 1 });
   }
+  // 案内の途中で10秒なにもしなければ、押す場所をもう一度そっと知らせる（そのあとも10秒ごとに1回）
+  var lastInput = 0, lastNudge = 0, nudgeTimer = 0;
+  function nudgeCoach() {
+    var arrow = $('coachArrow'), tip = $('coachTip');
+    lastNudge = Date.now();
+    arrow.classList.remove('show'); void arrow.offsetWidth; arrow.classList.add('show');
+    var cls = tip.classList.contains('above') ? 'nudge-down' : 'nudge-up';
+    tip.classList.remove('nudge-up', 'nudge-down'); void tip.offsetWidth; tip.classList.add(cls);
+    clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(function () { tip.classList.remove('nudge-up', 'nudge-down'); arrow.classList.remove('show'); }, 3000);
+  }
   function coachClose(markDone) {
     if (!coachNow) return;
     var c = coachNow;
     coachNow = null;
     $('coach').hidden = true;
+    $('coachArrow').classList.remove('show');
     if (markDone) {
-      if (c.kind === 'core') { state.tut.core = c.index + 1 >= TUT_CORE.length ? 99 : c.index + 1; tutPassed(c.index); }
+      if (c.kind === 'core') { state.tut.core = c.index + 1 >= TUT_CORE.length ? 99 : c.index + 1; tutPassed(c.index); if (state.tut.core === 99) goalHintPending = true; }
       else if (c.kind === 'ship') state.tut.ship = 1;
-      else state.tut.seen[c.spec.id] = 1;
+      else if (c.kind !== 'goal') state.tut.seen[c.spec.id] = 1;
       save();
     }
   }
@@ -844,7 +902,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   function placeCoach() {
     if (!coachNow) return;
     var spec = coachNow.spec, hole = $('coachHole'), tip = $('coachTip');
-    var sheetTop = $('sheet').getBoundingClientRect().top + 8, rect = null, round = !!spec.round;
+    var sr = $('sheet').getBoundingClientRect(), sheetTop = sr.top + 8, rect = null, round = !!spec.round;
+    tip.style.left = (sr.left + 16) + 'px'; tip.style.right = Math.max(16, window.innerWidth - sr.right + 16) + 'px';
     var el = coachEl(spec);
     if (el) {
       var r = el.getBoundingClientRect(), pad = round ? 4 : 6;
@@ -854,6 +913,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (pt) { var cr = cv.getBoundingClientRect(); rect = { left: cr.left + pt.x - pt.r, top: cr.top + pt.y - pt.r, width: pt.r * 2, height: pt.r * 2 }; round = true; }
     }
     hole.hidden = !rect;
+    var arrow = $('coachArrow');
+    if (rect) { arrow.style.left = (rect.left + rect.width / 2) + 'px'; arrow.style.top = Math.max(2, rect.top - 20) + 'px'; }
+    else arrow.classList.remove('show');
     tip.classList.remove('above', 'below', 'free');
     var th = tip.offsetHeight || 60, top;
     if (rect) {
@@ -886,9 +948,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (!t.replay && sp.done && sp.done()) { coachClose(true); return; }
       if (sp.auto && !t.replay && age > sp.auto) { coachClose(true); return; }
       if ((sp.el || sp.point) && !coachEl(sp) && !(sp.point && sp.point())) { coachClose(false); return; }
+      if ((c.kind === 'core' || c.kind === 'ship' || c.kind === 'goal') && !$('coachHole').hidden && Date.now() - Math.max(coachShownAt, lastInput, lastNudge) > 10000) nudgeCoach();
       return;
     }
-    if (!$('adLayer').hidden || !$('menuPage').hidden || !$('welcome').hidden) return;
+    if (!$('adLayer').hidden || !$('menuPage').hidden || !$('welcome').hidden || !$('intro').hidden) return;
     // 金の船は、来たときに割り込む（出てくる間隔は変えない）
     if (!t.ship && state.guided === 0 && bonus && !bonus.done && bonus.x > 20 && bonus.x < W - 20) { coachOpen('ship', TUT_SHIP); return; }
     if (t.core < 99) {
@@ -904,6 +967,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       return;
     }
     if (t.replay) { t.replay = 0; save(); }
+    if (goalHintPending) { goalHintPending = false; if (coachEl(TUT_GOAL)) { coachOpen('goal', TUT_GOAL); return; } }
     for (var i = 0; i < TUT_HINTS.length; i++) {
       var h = TUT_HINTS[i];
       if (!t.seen[h.id] && h.when()) { coachOpen('hint', h); return; }
@@ -1129,7 +1193,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var top = Math.round(Math.max(lo, Math.min(hi, H - head - need)));
     if (sh.style.getPropertyValue('--sheet-top') === top + 'px') return;
     sh.style.setProperty('--sheet-top', top + 'px');
-    resize(); placeCalls();
+    resize(); placeCalls(); placeIntro();
   }
   function placeCalls() {
     // お知らせと船の呼びかけを、次の目標の行にぴったり重ねる
@@ -1692,6 +1756,17 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     $('upCount').textContent = bought + '/' + UPS.length;
   }
 
+  // 航路の物差し：いまの光達距離を、3〜22海里の上の位置で
+  var routePct = -1;
+  function renderRoute() {
+    var pct = Math.round(Math.max(0, Math.min(1, (rangeNow - 3) / 19)) * 1000) / 10;
+    if (pct === routePct) return;
+    routePct = pct; $('routeDone').style.width = pct + '%';
+  }
+  function routeToast() {
+    var left = 22 - rangeNow;
+    toast(left > 0.05 ? '世界の果ての灯台（22海里）まで あと ' + left.toFixed(1) + '海里' : '世界の果ての灯台に、光が届いている', 3600, 2, 'route');
+  }
   function renderGoal() {
     var cands = [], i;
     for (i = 0; i < GENS.length; i++) {
@@ -1714,6 +1789,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     $('goal').dataset.ready = ready.length ? 'true' : 'false';
     $('goalName').textContent = pick.name;
     $('goalLeft').textContent = left;
+    renderRoute();
   }
 
   // 図鑑の絵(線と面だけの小さなシルエット)
@@ -3352,8 +3428,15 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       else coachClose(true);
     });
     $('coachNext').addEventListener('click', function () { coachClose(true); renderAll(); });
+    ['pointerdown', 'keydown'].forEach(function (n) { document.addEventListener(n, function () { lastInput = Date.now(); }, true); });
+    // 目的のカード：「はじめる」で案内へ、「とばす」でカードだけ閉じる（案内は出る）
+    $('introGo').addEventListener('click', function () { track('intro_start'); closeIntro(); });
+    $('introSkip').addEventListener('click', function () { track('intro_skip'); closeIntro(); });
+    // 次の目標の行：押すと、最後の目標までの距離を1行で
+    $('goal').addEventListener('click', routeToast);
+    $('goal').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); routeToast(); } });
     $('welcomeOk').addEventListener('click', function () { clearInterval(welcomeTimer); $('welcome').hidden = true; playAwayReach(); renderAll(); });
-    window.addEventListener('resize', function () { layoutSheet(); placeCalls(); placeCoach(); });
+    window.addEventListener('resize', function () { layoutSheet(); placeCalls(); placeCoach(); placeIntro(); });
     if (window.visualViewport) window.visualViewport.addEventListener('resize', layoutSheet);
     window.addEventListener('orientationchange', function () { setTimeout(layoutSheet, 200); });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutSheet);
@@ -3398,6 +3481,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     else window.addEventListener('resize', resize);
   }
 
+  // 目的のカード：景色（手帳の上）の真ん中に置く
+  function placeIntro() {
+    var el = $('intro');
+    if (!el || el.hidden) return;
+    el.style.top = Math.max(el.offsetHeight / 2 + 8, $('sheet').getBoundingClientRect().top / 2) + 'px';
+  }
+  function showIntro() { $('intro').hidden = false; placeIntro(); setTimeout(function () { var b = $('introGo'); if (b) b.focus(); }, 50); }
+  function closeIntro() { $('intro').hidden = true; renderAll(); }
   function start(data) {
     var fromHot = data && data.state ? sanitize(data.state) : null;
     var loaded = fromHot || load();
@@ -3419,6 +3510,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (dt > 10) away(dt);
     }
     if (!loaded) track('tutorial_begin');   // セーブが無く、新しく始めたとき
+    if (!loaded && !fromHot) showIntro();
     renderAll();
     applySound();
     requestAnimationFrame(frame);
