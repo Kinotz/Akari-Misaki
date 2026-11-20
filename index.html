@@ -361,6 +361,18 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 .coach-tip.below::after { top: -20px; border-bottom: 11px solid var(--ink-b); }
 .coach-tip.above::after { bottom: -20px; border-top: 11px solid var(--ink-b); }
 .coach-tip.free::after { display: none; }
+/* 案内の途中で10秒なにもしないとき：押す場所の上に、墨茶の小さな矢印を一度だけ下ろす（脈動・光るふちは使わない） */
+.coach-arrow {
+  position: fixed; width: 0; height: 0; pointer-events: none; opacity: 0; transform: translate(-50%, 0);
+  border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 16px solid var(--ink-b);
+  filter: drop-shadow(2px 2px 0 var(--accent));
+}
+.coach-arrow.show { animation: arrowDrop 2.6s ease-out forwards; }
+@keyframes arrowDrop { 0% { opacity: 0; transform: translate(-50%, -16px); } 23% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 0); } }
+.coach-tip.nudge-up { animation: nudgeUp 0.5s ease-out; }
+.coach-tip.nudge-down { animation: nudgeDown 0.5s ease-out; }
+@keyframes nudgeUp { 50% { transform: translateY(-4px); } }
+@keyframes nudgeDown { 50% { transform: translateY(4px); } }
 
 /* 目的のカード：初めて開いたときだけ、景色の上に2行で */
 .intro {
@@ -413,11 +425,14 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 .adbtns .linkbtn { align-self: center; }
 
 
+@keyframes arrowStill { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) {
   .rank-news { animation: none; }
   .gain.show { animation: none; opacity: 1; }
   .row.bought .price, .row.shake .price { animation: none; }
   .polish, .polish * { transition: none !important; animation: none !important; }
+  .coach-arrow.show { animation: arrowStill 3s step-end forwards; }
+  .coach-tip.nudge-up, .coach-tip.nudge-down { animation: none; }
 }
 </style>
 </head>
@@ -580,6 +595,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
 <div class="coach" id="coach" hidden>
   <div class="coach-hole" id="coachHole" aria-hidden="true"></div>
+  <div class="coach-arrow" id="coachArrow" aria-hidden="true"></div>
   <div class="coach-tip" id="coachTip" role="status">
     <p id="coachText"></p>
     <div class="coach-btns">
@@ -811,7 +827,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var coachNow = null, coachShownAt = 0;
   function firstUpPrice() { var k = Object.keys(upEls)[0]; return k ? upEls[k].price : null; }
   var TUT_CORE = [
-    { id: 'polish', el: 'polish', round: true, text: '灯りを磨いて、光を集める',
+    { id: 'polish', el: 'polish', round: true, text: 'ここを押して、灯りを磨こう',
       done: function () { return state.light >= 15 || state.owned.lamp > 0; } },
     { id: 'buy', el: function () { return genEls.lamp && genEls.lamp.price; }, text: '光がたまった。石油ランプを灯す',
       done: function () { return state.owned.lamp > 0; } },
@@ -849,11 +865,23 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (index + 1 >= TUT_CORE.length) track('tutorial_complete');
     else track('tutorial_step', { step: index + 1 });
   }
+  // 案内の途中で10秒なにもしなければ、押す場所をもう一度そっと知らせる（そのあとも10秒ごとに1回）
+  var lastInput = 0, lastNudge = 0, nudgeTimer = 0;
+  function nudgeCoach() {
+    var arrow = $('coachArrow'), tip = $('coachTip');
+    lastNudge = Date.now();
+    arrow.classList.remove('show'); void arrow.offsetWidth; arrow.classList.add('show');
+    var cls = tip.classList.contains('above') ? 'nudge-down' : 'nudge-up';
+    tip.classList.remove('nudge-up', 'nudge-down'); void tip.offsetWidth; tip.classList.add(cls);
+    clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(function () { tip.classList.remove('nudge-up', 'nudge-down'); arrow.classList.remove('show'); }, 3000);
+  }
   function coachClose(markDone) {
     if (!coachNow) return;
     var c = coachNow;
     coachNow = null;
     $('coach').hidden = true;
+    $('coachArrow').classList.remove('show');
     if (markDone) {
       if (c.kind === 'core') { state.tut.core = c.index + 1 >= TUT_CORE.length ? 99 : c.index + 1; tutPassed(c.index); if (state.tut.core === 99) goalHintPending = true; }
       else if (c.kind === 'ship') state.tut.ship = 1;
@@ -874,7 +902,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   function placeCoach() {
     if (!coachNow) return;
     var spec = coachNow.spec, hole = $('coachHole'), tip = $('coachTip');
-    var sheetTop = $('sheet').getBoundingClientRect().top + 8, rect = null, round = !!spec.round;
+    var sr = $('sheet').getBoundingClientRect(), sheetTop = sr.top + 8, rect = null, round = !!spec.round;
+    tip.style.left = (sr.left + 16) + 'px'; tip.style.right = Math.max(16, window.innerWidth - sr.right + 16) + 'px';
     var el = coachEl(spec);
     if (el) {
       var r = el.getBoundingClientRect(), pad = round ? 4 : 6;
@@ -884,6 +913,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (pt) { var cr = cv.getBoundingClientRect(); rect = { left: cr.left + pt.x - pt.r, top: cr.top + pt.y - pt.r, width: pt.r * 2, height: pt.r * 2 }; round = true; }
     }
     hole.hidden = !rect;
+    var arrow = $('coachArrow');
+    if (rect) { arrow.style.left = (rect.left + rect.width / 2) + 'px'; arrow.style.top = Math.max(2, rect.top - 20) + 'px'; }
+    else arrow.classList.remove('show');
     tip.classList.remove('above', 'below', 'free');
     var th = tip.offsetHeight || 60, top;
     if (rect) {
@@ -916,6 +948,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (!t.replay && sp.done && sp.done()) { coachClose(true); return; }
       if (sp.auto && !t.replay && age > sp.auto) { coachClose(true); return; }
       if ((sp.el || sp.point) && !coachEl(sp) && !(sp.point && sp.point())) { coachClose(false); return; }
+      if ((c.kind === 'core' || c.kind === 'ship' || c.kind === 'goal') && !$('coachHole').hidden && Date.now() - Math.max(coachShownAt, lastInput, lastNudge) > 10000) nudgeCoach();
       return;
     }
     if (!$('adLayer').hidden || !$('menuPage').hidden || !$('welcome').hidden || !$('intro').hidden) return;
@@ -3395,6 +3428,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       else coachClose(true);
     });
     $('coachNext').addEventListener('click', function () { coachClose(true); renderAll(); });
+    ['pointerdown', 'keydown'].forEach(function (n) { document.addEventListener(n, function () { lastInput = Date.now(); }, true); });
     // 目的のカード：「はじめる」で案内へ、「とばす」でカードだけ閉じる（案内は出る）
     $('introGo').addEventListener('click', function () { closeIntro(); });
     $('introSkip').addEventListener('click', function () { closeIntro(); });
