@@ -259,6 +259,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
 }
 .linkbtn.danger { background: var(--nano); border: 2.5px solid var(--ink-b); text-decoration: none; padding: 0 12px; }
+a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
 
 /* 広告枠：買い物リストの末尾。ボタンと間違えないよう、上に余白と区切り線、「広告」の表示 */
 .adslot { display: flex; flex-direction: column; gap: 6px; margin-top: 24px; padding-top: 10px; border-top: 2.5px solid var(--ink-b); }
@@ -509,6 +510,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
           <button class="linkbtn" id="resetNo" type="button">やめる</button>
         </span>
       </div>
+      </section>
+      <section aria-labelledby="abTitle">
+        <h3 id="abTitle">このゲームについて</h3>
+        <a class="linkbtn" id="privacyLink" href="privacy.html">プライバシーポリシー</a>
       </section>
     </div>
   </section>
