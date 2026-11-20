@@ -299,7 +299,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .coach { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
 .coach-hole {
   position: fixed; border: 3px solid var(--nano); outline: 2.5px solid var(--ink-b);
-  box-shadow: 0 0 0 9999px rgba(51, 38, 31, 0.45); transition: left 0.2s, top 0.2s, width 0.2s, height 0.2s;
+  box-shadow: 0 0 0 9999px rgba(51, 38, 31, 0.45);
 }
 .coach-hole.round { border-radius: 50%; }
 .coach-tip {
@@ -366,7 +366,6 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .coach-hole { transition: none; }
   .rank-news { animation: none; }
   .gain.show { animation: none; opacity: 1; }
   .row.bought .price, .row.shake .price { animation: none; }
