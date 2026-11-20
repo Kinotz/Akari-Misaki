@@ -110,8 +110,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* 次の目標（1行） */
 .goal {
-  flex: none; display: flex; align-items: baseline; gap: 8px; font-size: 15px;
-  padding: 2px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));
+  flex: none; display: flex; align-items: center; gap: 8px; font-size: 15px; min-height: 48px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
   border-bottom: 2.5px solid var(--ink-b);
 }
 .goal b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
@@ -128,14 +128,6 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .sheet-body > * { min-width: 0; flex: none; }
 
 .label { font-size: 13px; font-weight: 700; }
-
-/* 金色の船が来たときだけ出る呼びかけ */
-.guide {
-  position: sticky; top: 0; z-index: 2;
-  width: 100%; min-height: 48px; border-radius: 0; cursor: pointer;
-  border: 2.5px solid var(--ink-b); background: var(--nano); color: var(--ink-b);
-  font: 700 16px/1 var(--font-display);
-}
 
 .hint { margin: 0; font-size: 15px; line-height: 1.6; }
 
@@ -247,14 +239,27 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .adslot-tag { font-size: 13px; font-weight: 700; }
 .adslot-body { display: flex; justify-content: center; align-items: center; min-height: 50px; max-width: 100%; overflow: hidden; }
 
-/* お知らせ(手帳の中、ドックのすぐ上に出る) */
-.toast {
-  position: absolute; z-index: 3; left: 50%; transform: translateX(-50%);
-  bottom: calc(118px + env(safe-area-inset-bottom, 0px));
-  width: max-content; max-width: calc(100% - 32px); padding: 8px 14px;
-  background: var(--nano); border: 2.5px solid var(--ink-b); color: var(--ink-b);
-  font-size: 15px; font-weight: 700; line-height: 1.5; text-align: center; pointer-events: none;
+/* お知らせ：次の目標の行に重ねて1件ずつ出す（磨く・買う・追い風のボタンにはかぶせない） */
+.toast, .call {
+  position: absolute; z-index: 3; left: 0; right: 0; top: var(--goal-top, 150px); height: var(--goal-h, 48px);
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  background: var(--nano); border-top: 2.5px solid var(--ink-b); border-bottom: 2.5px solid var(--ink-b); color: var(--ink-b);
+  font-size: 15px; font-weight: 700; line-height: 1.4;
 }
+.toast { z-index: 4; pointer-events: none; }
+.call span { flex: 1; min-width: 0; }
+.call-btn {
+  flex: none; min-width: 72px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 0; cursor: pointer;
+  background: var(--accent); color: var(--on); font-weight: 700; font-size: 16px; box-shadow: 3px 2px 0 var(--ink-b);
+}
+/* 光の数のそばに出る「+N」 */
+.bank { position: relative; }
+.gain {
+  position: absolute; left: 0; top: -6px; font-size: 16px; font-weight: 700; opacity: 0; pointer-events: none;
+}
+.gain.show { animation: gainUp 0.9s ease-out forwards; }
+@keyframes gainUp { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
 
 .polish {
   position: relative; flex: none; width: 96px; height: 96px; border: 0; padding: 0; cursor: pointer;
@@ -317,6 +322,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .gain.show { animation: none; opacity: 1; }
   .row.bought .price, .row.shake .price { animation: none; }
   .polish, .polish * { transition: none !important; animation: none !important; }
 }
@@ -345,6 +351,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     <div class="bank">
       <span class="vh">集めた光</span>
       <strong id="light" class="num">0</strong>
+      <span class="gain num" id="gainFx" aria-hidden="true"></span>
       <span class="cps num" id="cps">毎秒 0</span>
     </div>
     <button class="polish" id="polish" type="button" aria-label="灯りを磨く">
@@ -353,12 +360,15 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     </button>
   </div>
 
+  <div class="call" id="guide" hidden>
+    <span id="guideText">金の船が通ります</span>
+    <button class="call-btn" id="guideBtn" type="button">導く</button>
+  </div>
   <section class="goal" id="goal" aria-label="次の目標">
     <span>次は</span><b id="goalName">石油ランプ</b><span class="goal-left num" id="goalLeft">あと 15 光</span>
   </section>
 
   <div class="sheet-body" id="sheetBody">
-    <button class="guide" id="guide" type="button" hidden>信号船を導く</button>
 
     <p class="hint" id="hint">灯りか塔をタップして光を集めよう。金色に光る船が通ったら、タップして岬へ導こう。</p>
 
@@ -513,7 +523,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   var state = null;
   var qty = 1;
   var W = 0, H = 0, VH = 0, dpr = 1, horizon = 0, lampX = 0, lampY = 0; // VH = 手帳の上端までの「景色の高さ」
-  var ships = [], floaters = [], stars = [], bonus = null;
+  var ships = [], stars = [], bonus = null;
   var nextBonus = 10, ambientTimer = 1, pulse = 0, theta = 0, rangeNow = 3;
   var creature = null, nextCreature = 35 + Math.random() * 35;
   // 景色の成長: 灯台の高さ(格に合わせて伸びる)、格上げの光、霧、衛星
@@ -690,13 +700,45 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   function gain(x) { state.light += x; state.total += x; }
 
   // ---------- 操作 ----------
-  function toast(msg, ms) {
-    var el = $('toast');
-    el.textContent = msg; el.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.hidden = true; }, ms || 3200);
+  // お知らせは1件ずつ順番に出す。大事なもの（格上げ・発見）は先に。同じ種類のものはまとめる。
+  var toastQ = [], toastNow = null;
+  function toast(msg, ms, pri, key) {
+    var item = { msg: msg, ms: Math.max(1800, Math.min(ms || 2600, 5000)), pri: pri || 1, key: key || '' };
+    if (item.key) {
+      if (toastNow && toastNow.key === item.key) { $('toast').textContent = msg; toastNow.msg = msg; return; }
+      toastQ = toastQ.filter(function (q) { return q.key !== item.key; });
+    }
+    var i = 0;
+    while (i < toastQ.length && toastQ[i].pri >= item.pri) i++;
+    toastQ.splice(i, 0, item);
+    pumpToast();
   }
-  function addFloater(x, y, text) { floaters.push({ x: x, y: y, text: text, age: 0 }); }
+  function pumpToast() {
+    if (toastNow || !toastQ.length) return;
+    var it = toastQ.shift(), el = $('toast');
+    toastNow = it;
+    el.textContent = it.msg; el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.hidden = true; toastNow = null;
+      setTimeout(pumpToast, 220);
+    }, it.ms);
+  }
+  // 「+N」は光の数のそばに。続けて磨くあいだは1つにまとめて足していく
+  var gainSum = 0, gainAt = 0;
+  function showGain(n) {
+    var el = $('gainFx'), now = Date.now();
+    gainSum = now - gainAt < 700 ? gainSum + n : n;
+    gainAt = now;
+    el.textContent = '+' + fmtNum(gainSum);
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
+  function placeCalls() {
+    // お知らせと船の呼びかけを、次の目標の行にぴったり重ねる
+    var g = $('goal'), sh = $('sheet');
+    sh.style.setProperty('--goal-top', g.offsetTop + 'px');
+    sh.style.setProperty('--goal-h', g.offsetHeight + 'px');
+  }
 
   var pressTimer = 0;
   function pressPolish() {
@@ -712,7 +754,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     gain(p);
     state.taps++;
     pulse = 1;
-    addFloater(lampX + (Math.random() - 0.5) * 36, lampY - 16, '+' + fmtNum(p));
+    showGain(p);
     sfx('tap');
     renderAll();
   }
@@ -745,8 +787,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     var reward = Math.max(100, cps() * 45);
     gain(reward);
     state.guided++;
-    addFloater(bonus.x, bonus.y - 30, '+' + fmtNum(reward));
-    toast('船を無事に導きました。光 +' + fmtNum(reward), 3600);
+    showGain(reward);
+    toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
     $('guide').hidden = true;
     renderAll(); save();
   }
@@ -754,7 +796,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     var sec = Math.min(dt, 28800);
     var g = cpsBase() * sec * 0.5;
     if (g > 0) gain(g);
-    if (sec >= 60 && g >= 1) toast('留守のあいだに光が ' + fmtNum(g) + ' 集まりました', 6000);
+    if (sec >= 60 && g >= 1) toast('留守のあいだに 光 +' + fmtNum(g), 4200, 2, 'away');
   }
 
   // ---------- 追い風(報酬型広告) ----------
@@ -790,7 +832,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   }
   function startBoost() {
     state.boostUntil = Date.now() + BOOST_MS;
-    toast('追い風が吹いています。3分間、光が2倍になります。', 4200);
+    toast('追い風が吹いた。3分間 光×2', 3200, 2, 'boost');
     renderAll(); save();
   }
 
@@ -829,7 +871,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     if ($('adLayer').hidden) return;
     adFailUntil = Date.now() + AD_RETRY_MS;
     closeAd(false);
-    toast('広告を読み込めませんでした。少しあとでもう一度どうぞ。', 3600);
+    toast('広告を読み込めなかった。少しあとでまた', 3200, 2, 'adfail');
     renderAll();
   }
 
@@ -978,7 +1020,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   }
   function toggleBgm() {
     bgmEnsure();
-    if (!bgmCtx) { toast('この端末ではBGMを再生できません。', 2600); return; }
+    if (!bgmCtx) { toast('この端末では音を鳴らせません', 2600); return; }
     bgmOn = !bgmOn;
     $('bgmBtn').setAttribute('aria-pressed', bgmOn ? 'true' : 'false');
     if (bgmOn) {
@@ -1268,6 +1310,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   var uiLast = '';
   function renderAll() {
     applyTimeColors();
+    placeCalls();
     var c = cps();
     rangeNow = rangeOf(state.total);
     var ri = rankIdx(rangeNow);
@@ -1276,7 +1319,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       rankFlash = 1;
       buzz([30, 60, 40]);
       sfx('rank');
-      toast('灯台の格が上がりました。' + RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
+      toast('格が上がった：' + RANKS[ri][1], 4200, 3, 'rank');
     }
     $('light').textContent = fmtNum(Math.floor(state.light));
     // 毎秒の横に、追い風（×2）と凪の恵み（凪×1.5）を言葉で添える
@@ -1347,7 +1390,11 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       bonus: isBonus, done: false, lit: false, hit: 30
     };
     ships.push(s);
-    if (isBonus) { bonus = s; $('guide').hidden = false; }
+    if (isBonus) {
+      bonus = s;
+      $('guideText').textContent = state.guided < 3 ? '金の船が来た。船か「導く」を押す' : '金の船が通ります';
+      $('guide').hidden = false;
+    }
     return s;
   }
   function ambientTarget() { return 1 + Math.min(4, Math.floor((rangeNow - 3) / 4)); }
@@ -1452,12 +1499,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     state.found++;
     var reward = Math.max(k.min, cps() * k.mult);
     gain(reward);
-    addFloater(creature.x, (creature.y0 || creature.y) - 22, '+' + fmtNum(reward));
+    showGain(reward);
     if (first) {
-      toast('図鑑に「' + k.name + '」が加わりました。光 +' + fmtNum(reward) + '、産出がずっと +5%', 5200);
+      toast('図鑑に「' + k.name + '」。産出がずっと +5%', 4200, 3);
       buzz([20, 40, 20]); sfx('find');
     } else {
-      toast(k.line + '光 +' + fmtNum(reward), 3400);
+      toast(k.line, 3000, 1, 'kind');
       buzz(15); sfx('find');
     }
     creature = null;
@@ -2081,32 +2128,17 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   }
 
   function drawOverlays(t) {
+    // 景色の上には文字を出さない。金の船には、脈打たない静かな印（菜の花色の輪と小さな三角）だけ
     if (bonus && !bonus.done) {
-      var s = bonus, rr = (20 + (reduce ? 0 : 4 * Math.sin(t * 4))) * s.sc;
-      ctx.strokeStyle = 'rgba(255,214,138,0.85)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(s.x, s.y0 - 10 * s.sc, rr, 0, 6.283); ctx.stroke();
-      if (state.guided < 3) {
-        ctx.font = "700 12px 'M PLUS Rounded 1c', sans-serif";
-        ctx.textAlign = 'center'; ctx.fillStyle = '#ffd68a';
-        ctx.fillText('タップで導く', s.x, s.y0 - 10 * s.sc - rr - 5);
-      }
+      var s = bonus, cy = s.y0 - 10 * s.sc, rr = 22 * s.sc;
+      ctx.lineWidth = 4; ctx.strokeStyle = '#33261F';
+      ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
+      ctx.lineWidth = 2.2; ctx.strokeStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
+      ctx.fillStyle = '#F2C14E'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(s.x - 6, cy - rr - 12); ctx.lineTo(s.x + 6, cy - rr - 12); ctx.lineTo(s.x, cy - rr - 4); ctx.closePath();
+      ctx.fill(); ctx.stroke();
     }
-    if (creature && state.found < 3 && creature.age > 0.6 && creature.y0 != null) {
-      ctx.font = "700 12px 'M PLUS Rounded 1c', sans-serif";
-      ctx.textAlign = 'center'; ctx.fillStyle = '#ffb8d6';
-      ctx.fillText('そっとタップ', creature.x, creature.y0 - 18 * creature.sc);
-    }
-    ctx.textAlign = 'center';
-    ctx.font = "700 18px 'M PLUS Rounded 1c', sans-serif";
-    for (var i = 0; i < floaters.length; i++) {
-      var f = floaters[i], a = Math.max(0, 1 - f.age / 0.9);
-      ctx.globalAlpha = a;
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,23,34,0.85)';
-      ctx.strokeText(f.text, f.x, f.y - f.age * 40);
-      ctx.fillStyle = '#ffd68a';
-      ctx.fillText(f.text, f.x, f.y - f.age * 40);
-    }
-    ctx.globalAlpha = 1;
   }
   function draw(t) {
     if (!W) return;
@@ -2143,16 +2175,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     dayT += dt;
     var ph2 = dayBlend();
     var golden = goldenActive();
-    if (golden && !goldenWas) toast('凪の恵み：しばらく光の産出が1.5倍になります', 4200);
+    if (golden && !goldenWas) toast('凪の恵み：しばらく光×1.5', 3600, 2, 'golden');
     goldenWas = golden;
     updateShoot(dt, ph2);
     updateScenery(dt);
     updateShips(dt);
     updateCreature(dt);
-    for (var i = floaters.length - 1; i >= 0; i--) {
-      floaters[i].age += dt;
-      if (floaters[i].age > 0.9) floaters.splice(i, 1);
-    }
   }
   function frame() {
     var now = Date.now(), dt = (now - last) / 1000;
@@ -2196,11 +2224,11 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     pb.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     window.addEventListener('blur', stopHold);
     pb.addEventListener('click', function (e) { if (e.detail === 0) polish(); });
-    $('guide').addEventListener('click', guide);
+    $('guideBtn').addEventListener('click', guide);
     $('bgmBtn').addEventListener('click', toggleBgm);
     $('rankBtn').addEventListener('click', function () {
       var ri = rankIdx(rangeNow);
-      toast(RANKS[ri][1] + '。' + RANKS[ri][2], 5600);
+      toast(RANKS[ri][2], 5000, 2, 'rankinfo');
     });
     $('boostBtn').addEventListener('click', function () {
       if ($('boostBtn').getAttribute('aria-disabled') === 'true' || !adUsable()) return;
@@ -2247,10 +2275,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     $('resetNo').addEventListener('click', function () { $('resetAsk').hidden = true; $('resetBtn').hidden = false; });
     $('resetYes').addEventListener('click', function () {
       try { localStorage.removeItem(KEY); } catch (e) {}
-      state = fresh(); upSig = null; floaters = []; theta = 0; nextBonus = 10;
+      state = fresh(); upSig = null; theta = 0; nextBonus = 10;
       seedShips(); renderAll();
       $('resetAsk').hidden = true; $('resetBtn').hidden = false;
-      toast('最初から始めます。灯りをタップしよう。', 3600);
+      toast('最初から始めます', 2600, 2);
       openMenu(false);
     });
 
