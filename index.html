@@ -85,6 +85,17 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   cursor: pointer; background: none; border: 0; padding: 4px 0; text-align: left; color: var(--ink-b);
 }
 .rank b { font: 700 17px/1.3 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* 格が上がった瞬間：見出しの上に、お知らせ色の告知を数秒だけ */
+.sheet-head { position: relative; }
+.rank-news {
+  position: absolute; z-index: 2; left: max(12px, env(safe-area-inset-left, 0px)); right: 100px; top: 4px; bottom: 0;
+  display: flex; flex-direction: column; justify-content: center; padding: 2px 12px;
+  background: var(--nano); border: 2.5px solid var(--ink-b); box-shadow: 4px 3px 0 var(--accent); color: var(--ink-b);
+  animation: newsIn 0.35s ease-out;
+}
+.rank-news small { font-size: 13px; font-weight: 700; line-height: 1.3; }
+.rank-news b { font-size: 18px; font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes newsIn { 0% { transform: translateY(-6px) scale(0.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
 /* 次の格までの進み：点が一つずつ塗られていき、最後に小さな灯台 */
 .steps { display: flex; align-items: center; gap: 5px; }
 .steps i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink-b); flex: none; }
@@ -322,6 +333,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .rank-news { animation: none; }
   .gain.show { animation: none; opacity: 1; }
   .row.bought .price, .row.shake .price { animation: none; }
   .polish, .polish * { transition: none !important; animation: none !important; }
@@ -335,6 +347,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 <main class="sheet" id="sheet" aria-label="灯台守の手帳">
   <h1 class="vh">灯りの岬</h1>
   <header class="sheet-head">
+    <div class="rank-news" id="rankNews" role="status" hidden><small>灯台の格が上がった</small><b id="rankNewsName"></b></div>
     <button class="rank" id="rankBtn" type="button" aria-label="いまの灯台の格について">
       <b id="rankName">港の常夜灯</b>
       <span class="steps" id="rankSteps" role="img" aria-label="次の格まで"></span>
@@ -529,7 +542,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   // 景色の成長: 灯台の高さ(格に合わせて伸びる)、格上げの光、霧、衛星
   var towerGrow = 0, rankFlash = 0;
   // 手触り：磨くと光線が一瞬伸び（beamKick）、灯りから光の粒（sparks）が舞う
-  var beamKick = 0, sparks = [];
+  var beamKick = 0, sparks = [], rankFx = 0;
   // 買ったとき：景色のその設備のあたりに、刷った光の輪がひろがる
   var buyRings = [], ripples = [];
   function equipSpot(id) {
@@ -1314,6 +1327,13 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     $(id).innerHTML = html;
   }
   // 次の格までの進み：いまの格の基準から次の格の基準まで（光達距離）を7つの点で
+  var rankNewsTimer = 0;
+  function showRankNews(name) {
+    $('rankNewsName').textContent = name;
+    $('rankNews').hidden = false;
+    clearTimeout(rankNewsTimer);
+    rankNewsTimer = setTimeout(function () { $('rankNews').hidden = true; }, 4800);
+  }
   var STEP_N = 7;
   var STEP_LH = '<svg width="16" height="20" viewBox="0 0 18 22" aria-hidden="true"><path d="M6 6h6l2 15H4z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 12h8" stroke="currentColor" stroke-width="3"/><path d="M5 6l4-4 4 4z" fill="currentColor"/></svg>';
   function renderRank(ri) {
@@ -1345,10 +1365,10 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     var ri = rankIdx(rangeNow);
     if (ri > state.rank) {
       state.rank = ri;
-      rankFlash = 1;
+      rankFlash = 1; rankFx = 1;
       buzz([30, 60, 40]);
       sfx('rank');
-      toast('格が上がった：' + RANKS[ri][1], 4200, 3, 'rank');
+      showRankNews(RANKS[ri][1]);
     }
     $('light').textContent = fmtNum(Math.floor(state.light));
     // 毎秒の横に、追い風（×2）と凪の恵み（凪×1.5）を言葉で添える
@@ -2221,6 +2241,26 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
       ctx.fill(); ctx.stroke();
     }
   }
+  function drawRankFx() {
+    // 格が上がった瞬間：灯台の後ろに刷った光の輪がひろがり、鳥が飛び立つ（文字は出さない）
+    if (rankFx <= 0) return;
+    var age = (1 - rankFx) * 3.2, a = Math.min(1, rankFx * 2);
+    for (var i = 0; i < 4; i++) {
+      var rad = age * 70 - i * 24;
+      if (rad <= 4) continue;
+      ctx.globalAlpha = a * 0.85; ctx.lineWidth = 6; ctx.strokeStyle = '#F2C14E';
+      ctx.beginPath(); ctx.arc(lampX, lampY, rad, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = a * 0.5; ctx.lineWidth = 2; ctx.strokeStyle = '#E2643F';
+      ctx.beginPath(); ctx.arc(lampX + 3, lampY + 2, rad, 0, 6.283); ctx.stroke();
+    }
+    ctx.globalAlpha = a; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    for (var b = 0; b < 5; b++) {
+      var dir = b % 2 ? 1 : -1, bx = lampX + dir * (20 + b * 9 + age * (38 + b * 6)), by = lampY - 10 - b * 7 - age * (14 + b * 4);
+      var flap = reduce ? 0 : Math.sin(age * 12 + b) * 2;
+      ctx.beginPath(); ctx.moveTo(bx - 7, by - 3 + flap); ctx.quadraticCurveTo(bx - 3, by - 4, bx, by + 1); ctx.quadraticCurveTo(bx + 3, by - 4, bx + 7, by - 3 + flap); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
   function drawRipples() {
     for (var i = 0; i < ripples.length; i++) {
       var r = ripples[i], k = r.age / 0.9;
@@ -2275,7 +2315,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     }
     drawPier(t); drawIsland(); drawHut(t); drawPathLamps(t); drawTower(); drawCreature(t);
     drawFog(t);
-    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples();
+    drawBeam(1, rl); drawBeam(-1, ll); drawGlow(1 - Math.abs(c)); drawSparks(); drawBuyRings(); drawRipples(); drawRankFx();
     ctx.globalCompositeOperation = 'lighter';
     drawRankFlash();
     ctx.globalCompositeOperation = 'source-over';
@@ -2291,6 +2331,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
     theta += ((reduce ? 0.35 : 0.9) + 0.08 * Math.sqrt(state.owned.clock || 0)) * dt;
     pulse = Math.max(0, pulse - dt * 3);
     beamKick = Math.max(0, beamKick - dt * 2.2);
+    rankFx = Math.max(0, rankFx - dt / 3.2);
     for (var pi = ripples.length - 1; pi >= 0; pi--) {
       ripples[pi].age += dt;
       if (ripples[pi].age > 0.9) ripples.splice(pi, 1);
