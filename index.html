@@ -148,6 +148,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .bank strong { font: 700 34px/1.05 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .bank .cps { margin-top: 2px; font-size: 15px; font-variant-numeric: tabular-nums; }
 .bank .cps em { font-style: normal; font-weight: 700; margin-left: 6px; }
+.bank .cps em small { font-size: 0.8em; font-weight: 400; margin-left: 2px; }
 
 /* 次の目標（1行） */
 .goal {
@@ -630,7 +631,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   // 送る値は設備・強化・生き物の id や段の番号などの区分だけ。名前・入力・セーブの中身は送らない。
   // 1回の読み込みで多くても TRACK_MAX 件、繰り返し押せるものは名前ごとに TRACK_LIMIT 件まで。
   var TRACK_MAX = 60;
-  var TRACK_LIMIT = { boost_click: 10, boost_reward: 10, boost_close: 10, boost_fail: 5, sound_toggle: 6, menu_open: 10, game_reset: 3 };
+  var TRACK_LIMIT = { boost_click: 10, boost_reward: 10, boost_close: 10, boost_fail: 5, sound_toggle: 6, menu_open: 10, game_reset: 3, ship_kind: 9 };
   var trackN = 0, trackSent = {};
   function track(name, params) {
     try {
@@ -1081,7 +1082,9 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       // tut: はじめの案内の段(core。99で終わり)、金の船の案内(ship)、初めて出る要素の一言を見たか(seen)
       tut: { core: 0, ship: 0, seen: {} },
       // snd: 環境音(bgm)と効果音(sfx)。はじめは効果音だけ鳴らす
-      snd: { bgm: 0, sfx: 1 } };
+      snd: { bgm: 0, sfx: 1 },
+      // buff: 金の船がくれた効果の終わる時刻（ミリ秒）。shipN: 種類ごとに導いた数
+      buff: { fest: 0, mirror: 0 }, shipN: { cargo: 0, fest: 0, mirror: 0 } };
   }
   function sanitize(s) {
     if (!s || typeof s !== 'object') return null;
@@ -1107,6 +1110,13 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (s.snd.bgm === 1) b.snd.bgm = 1;
       if (s.snd.sfx === 0) b.snd.sfx = 0;
     }
+    ['buff', 'shipN'].forEach(function (key) {
+      if (!s[key] || typeof s[key] !== 'object') return;
+      Object.keys(b[key]).forEach(function (k) {
+        var n = s[key][k];
+        if (typeof n === 'number' && isFinite(n) && n >= 0) b[key][k] = key === 'shipN' ? Math.floor(n) : n;
+      });
+    });
     if (s.tut && typeof s.tut === 'object') {
       if (typeof s.tut.core === 'number' && isFinite(s.tut.core)) b.tut.core = Math.max(0, Math.min(99, Math.floor(s.tut.core)));
       if (s.tut.ship === 1) b.tut.ship = 1;
@@ -1160,7 +1170,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       if (u.tap) m *= u.tap;
       if (u.share) share += u.share;
     });
-    return m + cps() * share;
+    return (m + cps() * share) * (buffOn('mirror') ? SHIP_KINDS.mirror.x : 1);
   }
   function rangeOf(total) { return 3 + 1.5 * Math.log10(1 + total); }
   function rankIdx(r) {
@@ -1306,14 +1316,23 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (!bonus || bonus.done) return;
     bonus.done = true;
     buzz([20, 30, 20]); sfx('guide');
-    var reward = Math.max(30, cps() * 45);
-    gain(reward);
+    var kind = bonus.gold || 'cargo', K = SHIP_KINDS[kind];
     var moored0 = harborCount();
     state.guided++;
+    state.shipN[kind]++;
     if (harborCount() > moored0) { popStart('harbor', harborCount() - 1); ringAt('harbor', harborCount() - 1); }
     if ([1, 10, 50, 100].indexOf(state.guided) >= 0) track('ship_guided', { count: state.guided });
-    showGain(reward);
-    toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
+    if ([1, 10, 50].indexOf(state.shipN[kind]) >= 0) track('ship_kind', { kind: kind, count: state.shipN[kind] });
+    if (kind === 'cargo') {
+      var reward = Math.max(SHIP_MIN, cps() * SHIP_SEC);
+      gain(reward);
+      showGain(reward);
+      toast('船を無事に導いた。光 +' + fmtNum(reward), 3000, 2);
+    } else {
+      // 同じ効果は重ねない（効いている間は同じ種類の船が来ない）。終わる時刻をセーブに持つ
+      state.buff[kind] = Date.now() + shipSec(kind) * 1000;
+      toast(K.name + '：' + shipSec(kind) + '秒 ' + K.what + '×' + K.x, 3600, 2, 'buff-' + kind);
+    }
     $('guide').hidden = true;
     renderAll(); save();
   }
@@ -1358,6 +1377,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var m = 1;
     if (Date.now() < state.boostUntil) m *= 2;
     if (goldenActive()) m *= 1.5;
+    if (buffOn('fest')) m *= SHIP_KINDS.fest.x;
     return m;
   }
   function startBoost() {
@@ -1448,6 +1468,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     if (!show) return;
     b.classList.toggle('on', on);
     b.setAttribute('aria-disabled', on ? 'true' : 'false');
+    // 灯祭り・凪の間だけ、重ねたときの倍率を小さい字で見せる（ポップアップは出さない）
+    var mx = on ? 1 : boostMult(), combo = mx > 1 ? parseFloat((mx * 2).toFixed(1)) : 0;
     if (on) {
       var s = Math.ceil((state.boostUntil - Date.now()) / 1000);
       $('boostTitle').textContent = '追い風が吹いている';
@@ -1455,10 +1477,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       $('boostTag').textContent = '光×2';
     } else {
       $('boostTitle').textContent = '追い風を呼ぶ';
-      $('boostSub').textContent = '3分間 光×2';
+      $('boostSub').textContent = combo ? '重ねると 光×' + combo : '3分間 光×2';
       $('boostTag').textContent = '広告';
     }
-    b.setAttribute('aria-label', on ? '追い風が吹いている。' + $('boostSub').textContent : '広告を見て追い風を呼ぶ（3分間 光が2倍）');
+    b.setAttribute('aria-label', on ? '追い風が吹いている。' + $('boostSub').textContent : '広告を見て追い風を呼ぶ（3分間 光が2倍' + (combo ? '。いまの効果と重ねると光×' + combo : '') + '）');
   }
 
   // ---------- 音（すべてその場で合成。音のファイルは使わない） ----------
@@ -1914,9 +1936,15 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     }
     $('light').textContent = fmtNum(Math.floor(state.light));
     // 毎秒の横に、追い風（×2）と凪の恵み（凪×1.5）を言葉で添える
-    var tags = '';
-    if (Date.now() < state.boostUntil) tags += '<em>追い風×2</em>';
-    if (goldenActive()) tags += '<em>凪×1.5</em>';
+    // 灯祭り・鏡職人は残りの秒も小さく。3つ以上重なったら、毎秒に掛かる倍率を「重ね×N」の1つにまとめて1行に収める
+    var tagList = [];
+    if (Date.now() < state.boostUntil) tagList.push(['追い風', 2]);
+    if (goldenActive()) tagList.push(['凪', 1.5]);
+    if (buffOn('fest')) tagList.push([SHIP_KINDS.fest.tag, SHIP_KINDS.fest.x, buffLeft('fest')]);
+    var mirrorTag = buffOn('mirror') ? [SHIP_KINDS.mirror.tag, SHIP_KINDS.mirror.x, buffLeft('mirror')] : null;
+    if (tagList.length + (mirrorTag ? 1 : 0) >= 3) tagList = [['重ね', parseFloat(boostMult().toFixed(1))]];
+    if (mirrorTag) tagList.push(mirrorTag);
+    var tags = tagList.map(function (t) { return '<em>' + t[0] + '×' + t[1] + (t[2] ? '<small>' + t[2] + '</small>' : '') + '</em>'; }).join('');
     setHTML('cps', '毎秒 ' + fmtNum(c) + tags);
     $('tapGain').textContent = '+' + fmtNum(tapPower());
     renderRank(Math.min(ri, state.rank));   // おかえり中に上がった格は、格上げを見せるまで見出しも前のまま
@@ -1963,6 +1991,25 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   }
 
   // ---------- 船 ----------
+  // 金の船の種類。w=出る重み（いま効いている効果と同じ種類は選ばない）、sec=効く秒数、x=倍率、col=船の上の印の色
+  // 最初の1隻は必ず積み荷の船（光 SHIP_MIN 以上）。積み荷は毎秒の SHIP_SEC 秒ぶん（灯祭り・凪の間はその倍率ごと）
+  var SHIP_KINDS = {
+    cargo:  { name: '積み荷の船', call: '金の船が通ります',       w: 75, col: '#F2C14E' },
+    fest:   { name: '灯祭りの船', call: '灯祭りの船が通ります',   w: 10, sec: 40, x: 5,  what: '光',     tag: '祭', col: '#E2643F' },
+    mirror: { name: '鏡職人の船', call: '鏡職人の船が通ります',   w: 15, sec: 15, x: 30, what: '磨く力', tag: '磨', col: '#7DB9E0' }
+  };
+  var SHIP_SEC = 45, SHIP_MIN = 30;
+  function buffOn(k) { return !!state && state.buff[k] > Date.now(); }
+  function buffLeft(k) { return Math.max(0, Math.ceil((state.buff[k] - Date.now()) / 1000)); }
+  function shipSec(k) { return SHIP_KINDS[k].sec; }
+  function pickShipKind() {
+    if (state.guided === 0) return 'cargo';
+    var w = {}, sum = 0, k;
+    for (k in SHIP_KINDS) { w[k] = k !== 'cargo' && buffOn(k) ? 0 : SHIP_KINDS[k].w; sum += w[k]; }
+    var r = Math.random() * sum;
+    for (k in w) { r -= w[k]; if (r < 0) return k; }
+    return 'cargo';
+  }
   function seaBottom() { return VH * 0.78; }
   function spawnShip(isBonus) {
     var dir = Math.random() < 0.5 ? 1 : -1;
@@ -1984,7 +2031,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     ships.push(s);
     if (isBonus) {
       bonus = s;
-      $('guideText').textContent = '金の船が通ります';
+      s.gold = pickShipKind();
+      $('guideText').textContent = SHIP_KINDS[s.gold].call;
       $('guide').hidden = false;
     }
     return s;
@@ -3256,9 +3304,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       var s = bonus, cy = s.y0 - 10 * s.sc, rr = 22 * s.sc;
       ctx.lineWidth = 4; ctx.strokeStyle = '#33261F';
       ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
-      ctx.lineWidth = 2.2; ctx.strokeStyle = '#F2C14E';
+      var col = SHIP_KINDS[s.gold || 'cargo'].col;   // 種類ごとに印の色だけ変える
+      ctx.lineWidth = 2.2; ctx.strokeStyle = col;
       ctx.beginPath(); ctx.arc(s.x, cy, rr, 0, 6.283); ctx.stroke();
-      ctx.fillStyle = '#F2C14E'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.5;
+      ctx.fillStyle = col; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(s.x - 6, cy - rr - 12); ctx.lineTo(s.x + 6, cy - rr - 12); ctx.lineTo(s.x, cy - rr - 4); ctx.closePath();
       ctx.fill(); ctx.stroke();
     }
