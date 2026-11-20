@@ -187,7 +187,14 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* 設備・強化 */
 .shop { display: flex; flex-direction: column; }
-.tabs { display: flex; align-items: center; gap: 4px; border-bottom: 2.5px solid var(--ink-b); padding-bottom: 4px; }
+/* 設備・強化のタブ（とまとめ買い）は、手帳の中をスクロールしても上に残す。下の行が透けないよう紙の地を敷く */
+.tabs {
+  display: flex; align-items: center; gap: 4px; border-bottom: 2.5px solid var(--ink-b); padding-bottom: 4px;
+  position: sticky; top: -8px; z-index: 3; background: var(--grain), var(--paper);
+  margin-top: -8px; padding-top: 8px;
+}
+/* 少し傾いた値段の札と影が、タブの左右の端からのぞかないよう、紙の地を左右に少し広げる */
+.tabs::before { content: ""; position: absolute; top: 0; bottom: 0; left: -8px; right: -8px; z-index: -1; background: var(--grain), var(--paper); }
 .tab {
   background: none; border: 0; padding: 6px 10px; cursor: pointer; border-radius: 0;
   font: 700 15px/1.2 var(--font-display); color: var(--ink-b); white-space: nowrap;
@@ -689,6 +696,12 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
   var pops = {};
   function popStart(id, idx) { if (!reduce) pops[id] = { age: 0, idx: idx }; }
   function popTick(dt) { for (var k in pops) { pops[k].age += dt; if (pops[k].age > 0.6) delete pops[k]; } }
+  // 設備ごとの小さなエフェクト：買った瞬間に、その物らしい動きを1つだけ（まとめ買いでも1回）
+  var fxs = {}, FX_SEC = { lamp: 0.6, mirror: 0.5, keeper: 0.8, clock: 0.5, fresnel: 0.6, horn: 0.8, plant: 0.7, wind: 0.8, satellite: 0.8 };
+  function fxStart(id, idx) { if (!reduce && FX_SEC[id]) fxs[id] = { age: 0, idx: idx }; }
+  function fxTick(dt) { for (var k in fxs) { fxs[k].age += dt; if (fxs[k].age > FX_SEC[k]) delete fxs[k]; } }
+  function fxK(id) { var f = fxs[id]; return f ? Math.min(1, f.age / FX_SEC[id]) : null; }
+  function fxEase(id, idx) { var f = fxs[id]; if (!f || (idx != null && f.idx !== idx)) return 0; var k = fxK(id); return 1 - Math.pow(1 - k, 3); }
   function popK(id, idx) {
     var p = pops[id];
     if (!p || (p.idx != null && p.idx !== idx)) return 1;
@@ -1164,7 +1177,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     // 増えた1つがあればそれを、なければその設備の飾りを跳ねさせ、そこに刷った輪
     var newIdx = shownCount(id) > shown0 && (id === 'lamp' || id === 'wind' || id === 'plant' || id === 'keeper') ? shownCount(id) - 1 : null;
     popStart(id, newIdx);
-    sfx('buy', { tier: GENS.indexOf(g) }); flashRow(genEls[id] && genEls[id].row); ringAt(id, newIdx);
+    // エフェクトは増えた1つに。増えないときは、持ち数に合わせて順番に別の1つで（輪も同じ場所に）
+    var cnt1 = shownCount(id), fxIdx = newIdx != null ? newIdx : (id === 'lamp' || id === 'wind' || id === 'keeper') && cnt1 ? (state.owned[id] - 1) % cnt1 : null;
+    fxStart(id, fxIdx);
+    sfx('buy', { tier: GENS.indexOf(g) }); flashRow(genEls[id] && genEls[id].row); ringAt(id, fxIdx);
     renderAll(); save();
   }
   function buyUp(id) {
@@ -2399,7 +2415,8 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       var lp = pierLight(i, cnt);
       ctx.fillStyle = ink; ctx.fillRect(lp.x - 0.7, lp.y - 8, 1.4, 8);
       ctx.save(); popAround('plant', i, lp.x, lp.y);
-      ctx.globalAlpha = n * (0.75 + (reduce ? 0 : 0.25 * Math.sin(t * 2 + i))); ctx.fillStyle = '#F3E6C4';
+      var relit = fxK('plant'), seq = relit == null ? 1 : (relit * 1.15 > (i + 1) / cnt ? 1 : 0.12);   // 買った瞬間：根元から順にともり直す
+      ctx.globalAlpha = seq * n * (0.75 + (reduce ? 0 : 0.25 * Math.sin(t * 2 + i))); ctx.fillStyle = '#F3E6C4';
       ctx.beginPath(); ctx.arc(lp.x, lp.y - 9, 2.2, 0, 6.283); ctx.fill();
       ctx.restore(); ctx.globalAlpha = 1;
     }
@@ -2450,7 +2467,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       ctx.save(); popAround('wind', i, x, base);
       ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x, hubY); ctx.stroke();
-      var ang = (reduce ? 0.6 : t * (0.9 + i * 0.07)) + i * 1.3;
+      var ang = (reduce ? 0.6 : t * (0.9 + i * 0.07)) + i * 1.3 + fxEase('wind', i) * Math.PI * 2;   // 買った瞬間：羽が一回転
       ctx.lineWidth = 1.6;
       for (var k2 = 0; k2 < 3; k2++) { var a2 = ang + k2 * 2.094; ctx.beginPath(); ctx.moveTo(x, hubY); ctx.lineTo(x + Math.cos(a2) * blade, hubY + Math.sin(a2) * blade); ctx.stroke(); }
       if (hasUp('windtech')) {
@@ -2946,6 +2963,71 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     }
   }
 
+  // 設備ごとの小さなエフェクト（版画の線と面だけ。動いているあいだだけ数個の図形）
+  function drawFx() {
+    var any = false; for (var k0 in fxs) { any = true; break; }
+    if (!any) return;
+    var ph = dayBlend(), inkL = nightness() > 0.5 ? '#F3E6C4' : '#33261F', band = pc('band', ph), off = towerOff();
+    var lw = W * 0.027 * lanternScale(), ltop = VH * 0.255 + off, lh = VH * 0.07, k, f;
+    ctx.lineCap = 'round';
+    if ((k = fxK('lamp')) != null && state.owned.lamp > 0) {
+      // 石油ランプ：灯の頭に、涙形の小さな火がともる
+      f = fxs.lamp; var lp = lampSpot(f.idx || 0), tall = gs('lamp') >= 3 ? 4 : 0, fx0 = lp.x, fy0 = lp.y - 16 - tall;
+      var sc = k < 0.4 ? 1.25 * (k / 0.4) : 1.25 - 0.25 * ((k - 0.4) / 0.6);
+      ctx.globalAlpha = k > 0.75 ? (1 - k) / 0.25 : 1;
+      ctx.fillStyle = '#F2C14E'; ctx.strokeStyle = '#33261F'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(fx0, fy0 - 9 * sc); ctx.quadraticCurveTo(fx0 + 4.5 * sc, fy0 - 2 * sc, fx0, fy0); ctx.quadraticCurveTo(fx0 - 4.5 * sc, fy0 - 2 * sc, fx0, fy0 - 9 * sc); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = band; ctx.beginPath(); ctx.moveTo(fx0, fy0 - 5 * sc); ctx.quadraticCurveTo(fx0 + 2 * sc, fy0 - 1.5 * sc, fx0, fy0 - 0.5); ctx.quadraticCurveTo(fx0 - 2 * sc, fy0 - 1.5 * sc, fx0, fy0 - 5 * sc); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    if ((k = fxK('keeper')) != null && shownCount('keeper') > 0) {
+      // 見習い灯台守：家の足もとから小さな煙が、横へ流れて消える
+      f = fxs.keeper; var hp = houseSpot(f.idx || 0), hw = W * 0.07;
+      for (var j = 0; j < 3; j++) {
+        var dir = j === 1 ? 1 : -1, kk = Math.max(0, k - j * 0.12), rr = 2 + kk * 3.2;
+        ctx.globalAlpha = (1 - kk) * 0.9;
+        ctx.fillStyle = pc('tower', ph); ctx.strokeStyle = '#33261F'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(hp.x + dir * (hw * 0.45 + kk * (9 + j * 4)), hp.y - 2 - kk * (3 + j * 2), rr, 0, 6.283); ctx.fill(); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    if ((k = fxK('mirror')) != null) {
+      // 反射鏡：灯室の窓を、白い細い斜めの帯が1回横切る（鏡のきらり）
+      ctx.save(); ctx.beginPath(); ctx.rect(lampX - lw, ltop, lw * 2, lh); ctx.clip();
+      var bx = lampX - lw - 6 + (lw * 2 + 12) * k;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath(); ctx.moveTo(bx, ltop + lh); ctx.lineTo(bx + 3, ltop + lh); ctx.lineTo(bx + 9, ltop); ctx.lineTo(bx + 6, ltop); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    if ((k = fxK('fresnel')) != null) {
+      // フレネルレンズ：灯室の中だけで、同心の線が内から外へ一度ひろがる
+      ctx.save(); ctx.beginPath(); ctx.rect(lampX - lw, ltop, lw * 2, lh); ctx.clip();
+      ctx.strokeStyle = '#33261F'; ctx.lineWidth = 1.2;
+      for (var q = 0; q < 2; q++) { var kq = Math.max(0, k - q * 0.25); if (kq <= 0) continue; ctx.globalAlpha = 0.8 * (1 - kq); ctx.beginPath(); ctx.arc(lampX, ltop + lh / 2, 2 + kq * lw * 1.4, 0, 6.283); ctx.stroke(); }
+      ctx.restore(); ctx.globalAlpha = 1;
+    }
+    if ((k = fxK('horn')) != null) {
+      // 霧笛：ラッパの口から、細い音の弧が2本
+      var ox, oy, a0;
+      if (gs('horn') >= 4) { var hh = hornHouseSpot(); ox = hh.x - W * 0.0325 - 9; oy = hh.y - VH * 0.065 * 0.55; a0 = Math.PI; }
+      else { ox = lampX + W * 0.045 + 9 * (gs('horn') >= 2 ? 1.5 : 1); oy = VH * 0.325 + off - 9; a0 = 0; }
+      ctx.strokeStyle = inkL; ctx.lineWidth = 1.2;
+      for (var q2 = 0; q2 < 2; q2++) { var kh = Math.max(0, k - q2 * 0.22); if (kh <= 0 || kh >= 1) continue; ctx.globalAlpha = 1 - kh; ctx.beginPath(); ctx.arc(ox, oy, 3 + kh * 14, a0 - 0.5, a0 + 0.5); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+    if ((k = fxK('satellite')) != null) {
+      // 人工衛星管制局：パラボラ（無ければ空の衛星）から、短い電波の弧が3本
+      var sx, sy, sa;
+      if (gs('satellite') >= 2) { var dx = W * DISH_FX[0]; sx = dx - 2; sy = islandTopY(DISH_FX[0]) + 1 - 18; sa = -Math.PI / 2 - 0.5; }
+      else if (satSpot) { sx = satSpot.x; sy = satSpot.y + 4; sa = Math.PI / 2; }
+      if (sx != null) {
+        ctx.strokeStyle = band; ctx.lineWidth = 1.3;
+        for (var q3 = 0; q3 < 3; q3++) { var ks = Math.max(0, k - q3 * 0.15); if (ks <= 0 || ks >= 1) continue; ctx.globalAlpha = 1 - ks; ctx.beginPath(); ctx.arc(sx, sy, 3 + ks * 11, sa - 0.45, sa + 0.45); ctx.stroke(); }
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
   // 回転機構：灯室の窓の中を、光線の向きに合わせて明るい縞が横切る（レンズ板が回る）。塔の右に真鍮の歯車
   function gear(x, y, r, a, teeth) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(a);
@@ -2967,9 +3049,10 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     var sp = equipSpot('clock');
     ctx.save(); popAround('clock', null, sp.x, sp.y);
     var r1 = s >= 2 ? 5.5 : 4;
-    gear(sp.x, sp.y, r1, theta, 8);
-    if (s >= 3) gear(sp.x + r1 * 1.9, sp.y - r1 * 0.9, r1 * 0.66, -theta * 1.5 + 0.2, 6);
-    if (s >= 4) gear(sp.x + r1 * 0.3, sp.y + r1 * 2.1, r1 * 0.75, -theta * 1.33, 7);
+    var kick = fxEase('clock') * Math.PI / 2, th = theta + kick;   // 買った瞬間：1/4回転だけカチッと進む
+    gear(sp.x, sp.y, r1, th, 8);
+    if (s >= 3) gear(sp.x + r1 * 1.9, sp.y - r1 * 0.9, r1 * 0.66, -th * 1.5 + 0.2, 6);
+    if (s >= 4) gear(sp.x + r1 * 0.3, sp.y + r1 * 2.1, r1 * 0.75, -th * 1.33, 7);
     ctx.restore();
   }
   // 灯室の大きさ：最上位の格で1.12倍、フレネルレンズ 25・50・100個で さらに 1.2・1.36・1.5倍
@@ -3121,7 +3204,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
       s.lit = Math.abs(d) < (d > 0 ? rl : ll) * 0.95;
       drawShip(s, t);
     }
-    drawPier(t); drawIsland(); drawHarbor(t); drawHornHouse(t); drawDishes(); drawHut(t); drawPathLamps(t); drawPillar(); drawTower(); drawClockwork(); drawRankGhost(); drawCreature(t);
+    drawPier(t); drawIsland(); drawHarbor(t); drawHornHouse(t); drawDishes(); drawHut(t); drawPathLamps(t); drawPillar(); drawTower(); drawClockwork(); drawRankGhost(); drawFx(); drawCreature(t);
     drawFog(t);
     drawBeam(1, rl); drawBeam(-1, ll);
     if (gs('clock') >= 5) {
@@ -3142,7 +3225,7 @@ a.linkbtn { display: inline-flex; align-items: center; align-self: flex-start; }
     pulse = Math.max(0, pulse - dt * 3);
     beamKick = Math.max(0, beamKick - dt * 2.2);
     rankFx = Math.max(0, rankFx - dt / 3.2);
-    popTick(dt); reachTick(); awayTick(dt);
+    popTick(dt); fxTick(dt); reachTick(); awayTick(dt);
     for (var pi = ripples.length - 1; pi >= 0; pi--) {
       ripples[pi].age += dt;
       if (ripples[pi].age > 0.9) ripples.splice(pi, 1);
