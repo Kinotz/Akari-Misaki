@@ -187,7 +187,14 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* 設備・強化 */
 .shop { display: flex; flex-direction: column; }
-.tabs { display: flex; align-items: center; gap: 4px; border-bottom: 2.5px solid var(--ink-b); padding-bottom: 4px; }
+/* 設備・強化のタブ（とまとめ買い）は、手帳の中をスクロールしても上に残す。下の行が透けないよう紙の地を敷く */
+.tabs {
+  display: flex; align-items: center; gap: 4px; border-bottom: 2.5px solid var(--ink-b); padding-bottom: 4px;
+  position: sticky; top: -8px; z-index: 3; background: var(--grain), var(--paper);
+  margin-top: -8px; padding-top: 8px;
+}
+/* 少し傾いた値段の札と影が、タブの左右の端からのぞかないよう、紙の地を左右に少し広げる */
+.tabs::before { content: ""; position: absolute; top: 0; bottom: 0; left: -8px; right: -8px; z-index: -1; background: var(--grain), var(--paper); }
 .tab {
   background: none; border: 0; padding: 6px 10px; cursor: pointer; border-radius: 0;
   font: 700 15px/1.2 var(--font-display); color: var(--ink-b); white-space: nowrap;
